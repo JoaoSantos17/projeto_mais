@@ -59,11 +59,6 @@ Na **primeira vez** que envias esta branch:
 git push -u origin raquel-modelo-1
 ```
 
-Nas **vezes seguintes**, basta:
-
-```bash
-git push
-```
 
 ### Passo 5: Abrir o Pull Request
 
