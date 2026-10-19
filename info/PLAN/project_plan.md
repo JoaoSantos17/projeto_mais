@@ -7,7 +7,7 @@ output: html_document
 
 ## Pergunta PICO
 
-> Em doentes com insuficiência cardíaca com disfunção sistólica e classe NYHA III–IV (**P**), um modelo de regressão logística com creatinina sérica e fração de ejeção (**I**), comparado com modelos com mais variáveis (**C**), tem discriminação e calibração semelhantes na previsão da morte durante o seguimento (**O**)?
+> Em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe NYHA III–IV (**P**), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (**I**) tem discriminação e calibração semelhantes às de modelos com mais variáveis clínicas (**C**) na previsão da morte durante o seguimento, após validação interna (**O**)?
 
 ## Modelos
 
