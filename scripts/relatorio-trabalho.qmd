@@ -1,0 +1,643 @@
+---
+# Título que aparece no relatório.
+title: "Duas variáveis bastam? Predição da morte na insuficiência cardíaca com modelos de regressão logística de complexidade crescente"
+# Subtítulo com a identificação do trabalho.
+subtitle: "MAIS 2026/27 | Trabalho de grupo | Questão do tipo B: avaliar um modelo de predição"
+# Autores do Grupo E, por ordem alfabética.
+author:
+  - "Isabelle Araújo"
+  - "João Santos"
+  - "Joaquim Santos"
+  - "Raquel Bragança"
+# today usa a data em que o documento é renderizado.
+date: today
+# Define a língua de datas e rótulos do documento.
+lang: pt-PT
+# Formato de saída e respetivas opções.
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Mostrar o código"
+    # Inclui imagens e dependências no HTML, para entregar um ficheiro único.
+    embed-resources: true
+    fig-width: 7
+    fig-height: 4
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: pacotes
+#| include: false
+# Pacotes do Setup MAIS: tidyverse, gtsummary, broom, here.
+# Pacotes FORA do Setup MAIS usados neste relatório (instalar antes de renderizar):
+#   pROC   - curvas ROC, AUC e IC da AUC (o mesmo da sessão 4)
+#   car    - fatores de inflação da variância (car::vif)
+# O pacote splines vem com o R base e não precisa de instalação.
+library(tidyverse)
+library(gtsummary)
+library(broom)
+library(here)
+library(pROC)
+library(splines)
+# theme_gtsummary_language(): língua e separadores numéricos das tabelas gtsummary.
+theme_gtsummary_language("pt", decimal.mark = ",", big.mark = " ")
+```
+
+```{r}
+#| label: funcoes
+#| include: false
+# Funções de formatação: todos os números do texto passam por aqui, para terem
+# vírgula decimal e o mesmo número de casas.
+fmt <- function(x, d = 2) formatC(x, format = "f", digits = d, decimal.mark = ",")
+fmt_ic <- function(est, li, ls, d = 2) {
+  paste0(fmt(est, d), " (IC 95 % ", fmt(li, d), " a ", fmt(ls, d), ")")
+}
+fmt_p <- function(p) ifelse(p < 0.001, "p < 0,001", paste0("p = ", fmt(p, 3)))
+
+# Curva ROC com a mesma direção em todo o relatório (risco mais alto = morte),
+# como no guião da sessão 4.
+roc_y <- function(y, p) roc(y, p, levels = c(0, 1), direction = "<", quiet = TRUE)
+
+# Validação cruzada em 10 partes (código do ponto 3 da sessão 4, em função):
+# ajusta o modelo em nove partes e prevê a décima, dez vezes.
+# Devolve, para cada doente, a probabilidade prevista por um modelo que não o viu.
+prever_cv <- function(formula, dados, partes) {
+  p <- numeric(nrow(dados))
+  for (k in sort(unique(partes))) {
+    m_k <- glm(formula, data = dados[partes != k, ], family = binomial)
+    p[partes == k] <- predict(m_k, newdata = dados[partes == k, ], type = "response")
+  }
+  p
+}
+
+# Ajusta e avalia uma lista de modelos nos mesmos dados e com as MESMAS partes
+# da validação cruzada (mesma semente), para a comparação ser justa.
+avaliar_modelos <- function(formulas, dados, semente = 2026) {
+  set.seed(semente)
+  partes <- sample(rep(1:10, length.out = nrow(dados)))
+  ajustes <- map(formulas, \(f) glm(f, data = dados, family = binomial))
+  p_ap <- map(ajustes, \(m) predict(m, type = "response"))
+  p_cv <- map(formulas, \(f) prever_cv(f, dados, partes))
+  list(
+    y = dados$y,
+    ajustes = ajustes,
+    p_ap = p_ap,
+    p_cv = p_cv,
+    roc_ap = map(p_ap, \(p) roc_y(dados$y, p)),
+    roc_cv = map(p_cv, \(p) roc_y(dados$y, p))
+  )
+}
+
+# AUC aparente e validada, com IC 95 % de DeLong (ci.auc devolve
+# limite inferior, estimativa e limite superior), e otimismo.
+tabela_auc <- function(res) {
+  imap(res$roc_ap, \(r, m) {
+    ap <- as.numeric(ci.auc(r))
+    cv <- as.numeric(ci.auc(res$roc_cv[[m]]))
+    tibble(modelo = m,
+           auc_ap = ap[2], auc_ap_li = ap[1], auc_ap_ls = ap[3],
+           auc_cv = cv[2], auc_cv_li = cv[1], auc_cv_ls = cv[3])
+  }) |>
+    list_rbind() |>
+    mutate(otimismo = auc_ap - auc_cv)
+}
+
+# Calibração (adaptado de resumo_calibracao() da sessão 4, sem arredondar):
+# média prevista e observada, calibration-in-the-large e declive com IC 95 %.
+resumo_calibracao_num <- function(y, p) {
+  d <- tibble(y = y, p = p)
+  citl <- glm(y ~ offset(qlogis(p)), data = d, family = binomial)
+  cal <- glm(y ~ qlogis(p), data = d, family = binomial)
+  ic <- unname(confint.default(cal)[2, ])
+  tibble(prevista = mean(p), observada = mean(y),
+         citl = unname(coef(citl)[1]),
+         declive = unname(coef(cal)[2]), declive_li = ic[1], declive_ls = ic[2])
+}
+
+# Tabela de calibração por decis (função calibracao() da sessão 4).
+calibracao <- function(dados, grupos = 10) {
+  dados |>
+    mutate(decil = ntile(p, grupos)) |>
+    group_by(decil) |>
+    summarise(prevista = mean(p), observada = mean(y), n = n(), .groups = "drop")
+}
+
+# Diferença de AUC entre dois modelos, com IC 95 % por bootstrap emparelhado:
+# reamostra doentes com reposição e recalcula as duas AUC na mesma amostra.
+dif_auc <- function(y, p_a, p_b, B = 1000, semente = 2026) {
+  set.seed(semente)
+  est <- as.numeric(auc(roc_y(y, p_a))) - as.numeric(auc(roc_y(y, p_b)))
+  difs <- replicate(B, {
+    i <- sample(length(y), replace = TRUE)
+    as.numeric(auc(roc_y(y[i], p_a[i]))) - as.numeric(auc(roc_y(y[i], p_b[i])))
+  })
+  tibble(dif = est,
+         li = unname(quantile(difs, 0.025)),
+         ls = unname(quantile(difs, 0.975)))
+}
+```
+
+```{r}
+#| label: importar
+#| include: false
+# Ficheiro distribuído no Moodle, guardado em data/raw/ sem alterações.
+# Confirmar que o nome abaixo é o do ficheiro que está na pasta.
+ficheiro <- "heart_failure_clinical_records_dataset.csv"
+dados_brutos <- read_csv(here("data", "raw", ficheiro))
+```
+
+```{r}
+#| label: preparar
+#| include: false
+# Preparação dos dados: tudo o que é recodificado fica aqui, separado da análise.
+dados <- dados_brutos |>
+  # O desfecho aparece como DEATH_EVENT ou death_event conforme a versão:
+  # pôr todos os nomes em minúsculas resolve as duas.
+  rename_with(tolower) |>
+  mutate(
+    y = as.integer(death_event),
+    morte_f = factor(y, levels = c(0, 1), labels = c("Sobreviveu", "Morreu")),
+    # Creatinina e CPK têm cauda longa à direita: entram nos modelos em log2,
+    # e o OR lê-se por cada duplicação do valor.
+    log2_creatinina = log2(serum_creatinine),
+    log2_cpk = log2(creatinine_phosphokinase),
+    # Plaquetas por 100 000 unidades, para o OR não ficar 1,00 (1,00 a 1,00).
+    plaquetas_100k = platelets / 1e5
+  )
+
+# Números da descrição da base, usados no texto.
+n_total <- nrow(dados)
+n_mortes <- sum(dados$y)
+pct_mortes <- 100 * mean(dados$y)
+n_var <- ncol(dados_brutos)
+n_falta <- sum(is.na(dados_brutos))
+n_dup <- sum(duplicated(dados_brutos))
+seg_min <- min(dados$time)
+seg_max <- max(dados$time)
+seg_med_morte <- median(dados$time[dados$y == 1])
+seg_med_vivo <- median(dados$time[dados$y == 0])
+```
+
+```{r}
+#| label: modelos
+#| include: false
+# Os quatro modelos, definidos pela questão e pela literatura, sem seleção
+# automática. A variável time não entra em nenhum.
+preditores <- list(
+  M1 = c("ejection_fraction", "log2_creatinina"),
+  M2 = c("ejection_fraction", "log2_creatinina", "age", "serum_sodium"),
+  M3 = c("ejection_fraction", "log2_creatinina", "age", "serum_sodium",
+         "anaemia", "diabetes", "high_blood_pressure", "sex"),
+  M4 = c("ejection_fraction", "log2_creatinina", "age", "serum_sodium",
+         "anaemia", "diabetes", "high_blood_pressure", "sex",
+         "log2_cpk", "plaquetas_100k", "smoking")
+)
+rotulo_modelo <- c(M1 = "Modelo 1 (2 variáveis)", M2 = "Modelo 2 (4 variáveis)",
+                   M3 = "Modelo 3 (8 variáveis)", M4 = "Modelo 4 (11 variáveis)")
+formulas <- map(preditores, \(v) reformulate(v, response = "y"))
+
+# Mortes por parâmetro estimado (sem contar a ordenada na origem).
+epv <- tibble(modelo = names(preditores),
+              parametros = lengths(preditores),
+              epv = n_mortes / lengths(preditores))
+epv_m4 <- epv$epv[epv$modelo == "M4"]
+```
+
+```{r}
+#| label: analise-principal
+#| include: false
+principal <- avaliar_modelos(formulas, dados)
+disc <- tabela_auc(principal)
+calib <- imap(principal$p_cv, \(p, m) resumo_calibracao_num(principal$y, p) |>
+                mutate(modelo = m)) |>
+  list_rbind()
+
+# Comparação principal (modelo 1 contra modelo 4) e secundárias (2 e 3 contra 4),
+# sobre as predições da validação cruzada.
+comp_cv <- map(c("M1", "M2", "M3"), \(m)
+               dif_auc(principal$y, principal$p_cv[[m]], principal$p_cv$M4) |>
+                 mutate(comparacao = m)) |>
+  list_rbind()
+# A mesma diferença sem validação (AUC aparente), para mostrar o otimismo.
+comp_ap <- map(c("M1", "M2", "M3"), \(m)
+               dif_auc(principal$y, principal$p_ap[[m]], principal$p_ap$M4) |>
+                 mutate(comparacao = m)) |>
+  list_rbind()
+
+# Teste de razão de verosimilhanças entre modelos aninhados (cada um contra o 4).
+lrt <- map(c("M1", "M2", "M3"), \(m) {
+  a <- anova(principal$ajustes[[m]], principal$ajustes$M4, test = "LRT")
+  tibble(comparacao = m, chi2 = a$Deviance[2], gl = a$Df[2], p = a$`Pr(>Chi)`[2])
+}) |>
+  list_rbind()
+
+# Valores usados no texto.
+v <- function(tab, m, col) tab[[col]][tab$modelo == m]
+d1 <- comp_cv |> filter(comparacao == "M1")
+d1_ap <- comp_ap |> filter(comparacao == "M1")
+d1_inclui_zero <- d1$li < 0 & d1$ls > 0
+melhor_cv <- disc$modelo[which.max(disc$auc_cv)]
+or_m1 <- tidy(principal$ajustes$M1, exponentiate = TRUE, conf.int = TRUE)
+or_fe <- or_m1 |> filter(term == "ejection_fraction")
+or_cr <- or_m1 |> filter(term == "log2_creatinina")
+lrt_m1 <- lrt |> filter(comparacao == "M1")
+```
+
+```{r}
+#| label: pressupostos
+#| include: false
+# Linearidade no logit: cada variável contínua do modelo 4 entra como termo
+# linear ou como spline natural de 3 graus de liberdade; compara-se com o teste
+# de razão de verosimilhanças.
+continuas <- c("age", "ejection_fraction", "log2_creatinina", "serum_sodium",
+               "log2_cpk", "plaquetas_100k")
+linearidade <- map(continuas, \(var) {
+  outros <- setdiff(preditores$M4, var)
+  f_spline <- reformulate(c(outros, paste0("ns(", var, ", df = 3)")), response = "y")
+  m_spline <- glm(f_spline, data = dados, family = binomial)
+  a <- anova(principal$ajustes$M4, m_spline, test = "LRT")
+  tibble(variavel = var, p = a$`Pr(>Chi)`[2])
+}) |>
+  list_rbind()
+nao_lineares <- linearidade$variavel[linearidade$p < 0.05]
+
+# Multicolinearidade: fatores de inflação da variância no modelo 4.
+vif_m4 <- car::vif(principal$ajustes$M4)
+
+# Observações influentes: distância de Cook acima de 4/n.
+n_cook <- sum(cooks.distance(principal$ajustes$M4) > 4 / n_total)
+```
+
+```{r}
+#| label: sensibilidade
+#| include: false
+# S1: creatinina e CPK na escala original (sem logaritmo).
+troca_escala <- function(v) {
+  v[v == "log2_creatinina"] <- "serum_creatinine"
+  v[v == "log2_cpk"] <- "creatinine_phosphokinase"
+  v
+}
+formulas_s1 <- map(preditores, \(v) reformulate(troca_escala(v), response = "y"))
+s1 <- avaliar_modelos(formulas_s1, dados)
+
+# S2: horizonte fixo de 90 dias. Excluem-se os doentes que saíram do seguimento
+# antes dos 90 dias sem morrer; o desfecho passa a ser morte até ao dia 90.
+# time só serve para definir o desfecho; não entra em nenhum modelo.
+dados_90 <- dados |>
+  filter(!(time < 90 & y == 0)) |>
+  mutate(y = as.integer(y == 1 & time <= 90))
+n_excl_90 <- n_total - nrow(dados_90)
+n_90 <- nrow(dados_90)
+mortes_90 <- sum(dados_90$y)
+s2 <- avaliar_modelos(formulas, dados_90)
+
+sens <- list(Principal = principal, S1 = s1, S2 = s2)
+sens_disc <- map(sens, tabela_auc)
+sens_d1 <- map(sens, \(r) dif_auc(r$y, r$p_cv$M1, r$p_cv$M4))
+```
+
+## Resumo (abstract)
+
+**Contexto.** Os modelos de prognóstico da insuficiência cardíaca combinam muitas variáveis, o que dificulta o seu uso à cabeceira. Numa coorte pública, uma reanálise com *machine learning* concluiu que a creatinina sérica e a fração de ejeção bastavam para prever a morte.
+
+**Lacuna.** Não se sabe se essa conclusão se mantém com um modelo interpretável, com a calibração avaliada e com o otimismo corrigido por validação interna.
+
+**Objetivo.** Avaliar se um modelo de regressão logística apenas com creatinina sérica e fração de ejeção discrimina e está calibrado de forma semelhante a modelos com mais variáveis clínicas.
+
+**Métodos.** Coorte retrospetiva de `r n_total` doentes internados com insuficiência cardíaca com disfunção sistólica (classe NYHA III–IV) em dois hospitais de Faisalabad, em 2015. Comparámos quatro modelos de regressão logística definidos antes da análise, com 2, 4, 8 e 11 variáveis registadas na admissão. Medimos a discriminação pela AUC e a calibração pelo declive, com validação cruzada em 10 partes. A comparação principal foi a diferença de AUC validada entre o modelo com duas variáveis e o modelo com onze.
+
+**Resultados.** Morreram `r n_mortes` doentes (`r fmt(pct_mortes, 1)` %). A AUC aparente foi `r fmt_ic(v(disc, "M1", "auc_ap"), v(disc, "M1", "auc_ap_li"), v(disc, "M1", "auc_ap_ls"), 3)` no modelo com duas variáveis e `r fmt_ic(v(disc, "M4", "auc_ap"), v(disc, "M4", "auc_ap_li"), v(disc, "M4", "auc_ap_ls"), 3)` no modelo com onze. Após validação cruzada, foi `r fmt(v(disc, "M1", "auc_cv"), 3)` e `r fmt(v(disc, "M4", "auc_cv"), 3)`, respetivamente, com uma diferença de `r fmt_ic(d1$dif, d1$li, d1$ls, 3)`. O declive de calibração foi `r fmt_ic(v(calib, "M1", "declive"), v(calib, "M1", "declive_li"), v(calib, "M1", "declive_ls"))` no modelo com duas variáveis e `r fmt_ic(v(calib, "M4", "declive"), v(calib, "M4", "declive_li"), v(calib, "M4", "declive_ls"))` no modelo com onze. A diferença manteve a direção nas duas análises de sensibilidade.
+
+**Conclusões.** Nesta coorte, depois de corrigido o otimismo, o modelo com duas variáveis discrimina quase tanto como o modelo com onze e está pelo menos tão bem calibrado. O intervalo de confiança não exclui, porém, uma perda de discriminação clinicamente relevante, e a ausência de validação externa impede recomendar o uso clínico de qualquer dos modelos.
+
+## Introdução
+
+A insuficiência cardíaca afeta dezenas de milhões de pessoas em todo o mundo e continua associada a internamentos repetidos e a mortalidade elevada (1). Estimar o risco de morte de cada doente ajuda a decidir a intensidade do seguimento, o momento de referenciar para terapêuticas avançadas e a conversa sobre o prognóstico com o doente e a família.
+
+Existem modelos de prognóstico validados, como o Seattle Heart Failure Model (2) e o score MAGGIC (3). Ambos combinam muitas variáveis clínicas, laboratoriais e terapêuticas, o que exige dados completos e, na prática, uma calculadora. Um modelo com poucas variáveis, obtidas por rotina na admissão, seria mais fácil de aplicar, de validar noutras populações e de explicar.
+
+A base *Heart Failure Clinical Records*, recolhida em dois hospitais de Faisalabad (Paquistão) em 2015, foi analisada originalmente com regressão de Cox (4). Chicco e Jurman (5) reanalisaram-na com vários algoritmos de *machine learning* e concluíram que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência. Essa conclusão apoia-se em métricas de classificação e de discriminação. Não encontrámos nesse artigo uma avaliação da calibração, isto é, da concordância entre o risco previsto e o risco observado, que a norma TRIPOD+AI recomenda reportar em modelos de predição (6). Além disso, um modelo com muitas variáveis e poucos eventos tende a ter um desempenho aparente melhor do que o que teria em doentes novos, e esse otimismo só se corrige com validação interna (7).
+
+Este trabalho compara, com regressão logística e validação interna, um modelo com estas duas variáveis com modelos de complexidade crescente. A questão de avaliação, em formato PICO, é a seguinte: em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe NYHA III–IV (P), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (I) tem discriminação e calibração semelhantes às de um modelo com as onze variáveis clínicas da admissão (C) na previsão da morte durante o seguimento, após validação interna (O)?
+
+## Métodos
+
+### Dados
+
+Estudo observacional de uma coorte retrospetiva de doentes internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo, classe NYHA III–IV, no Faisalabad Institute of Cardiology e no Allied Hospital, em Faisalabad, entre abril e dezembro de 2015 (4). Usámos a base pública distribuída na unidade curricular, também disponível no UCI Machine Learning Repository (doi:10.24432/C5Z89R, licença CC BY 4.0), guardada em `data/raw/` sem alterações. Cada linha corresponde a um doente. A base tem `r n_total` doentes e `r n_var` variáveis, `r n_falta` valores em falta e `r n_dup` linhas duplicadas, pelo que não houve exclusões nem imputação.
+
+### Variáveis
+
+O desfecho foi a morte durante o seguimento (`DEATH_EVENT`). O seguimento variou entre `r seg_min` e `r seg_max` dias. A variável de seguimento (`time`) não entrou em nenhum modelo: só se conhece no fim do seguimento e depende do próprio desfecho, com uma mediana de `r fmt(seg_med_morte, 1)` dias nos doentes que morreram e de `r fmt(seg_med_vivo, 1)` dias nos restantes.
+
+Os preditores, todos registados na admissão, foram a idade (anos), a fração de ejeção (%), a creatinina sérica (mg/dL), o sódio sérico (mEq/L), a creatina fosfoquinase (CPK, mcg/L), as plaquetas, e cinco variáveis binárias: anemia, diabetes, hipertensão arterial, sexo e hábitos tabágicos. Depois de ver as distribuições, e antes de ajustar os modelos, decidimos que a creatinina e a CPK, com cauda longa à direita (@tbl-amostra), entravam em logaritmo de base 2; o *odds ratio* (OR) lê-se então por cada duplicação do valor. As plaquetas entraram por 100 000 unidades.
+
+Definimos quatro modelos sem seleção automática de variáveis (@tbl-epv): o modelo 1 tem as duas variáveis de Chicco e Jurman (5); o modelo 2 acrescenta a idade e o sódio; o modelo 3 acrescenta a anemia, a diabetes, a hipertensão e o sexo; o modelo 4 inclui todas as variáveis clínicas.
+
+```{r}
+#| label: tbl-epv
+#| tbl-cap: "Modelos comparados e número de mortes por parâmetro estimado (EPV)."
+epv |>
+  mutate(Modelo = rotulo_modelo[modelo],
+         Variáveis = map_chr(preditores, \(v) paste(v, collapse = ", ")),
+         EPV = fmt(epv, 1)) |>
+  select(Modelo, Variáveis, Parâmetros = parametros, EPV) |>
+  knitr::kable()
+```
+
+### Análise estatística
+
+Descrevemos os doentes por desfecho com mediana e intervalo interquartil, ou frequências, sem testes de hipótese.
+
+**Modelos e discriminação.** Ajustámos cada modelo por regressão logística e reportámos os OR com IC 95 %. A discriminação foi medida pela área sob a curva ROC (AUC), com IC 95 % pelo método de DeLong (8).
+
+**Validação interna.** Usámos validação cruzada em 10 partes, com as mesmas partes para os quatro modelos (semente 2026), como no guião da sessão 4. Não usámos uma divisão treino/teste porque deixaria cerca de `r round(0.3 * n_mortes)` mortes para um teste com 30 % dos doentes. Reportámos a AUC aparente, a AUC validada e a diferença entre as duas (otimismo).
+
+**Calibração.** Sobre as predições da validação cruzada, comparámos a média prevista com a observada, estimámos a *calibration-in-the-large* (ideal 0) e o declive de calibração (ideal 1), com IC 95 %, e desenhámos o gráfico do risco previsto contra a proporção observada por decis (9). Nos dados de ajuste estes valores dão 0 e 1 por construção, por isso só os calculámos fora da amostra.
+
+**Comparação entre modelos.** A medida principal foi a diferença de AUC validada entre o modelo 1 e o modelo 4, com IC 95 % por *bootstrap* emparelhado (1000 reamostragens de doentes). Os modelos 2 e 3 foram comparados com o modelo 4 da mesma forma, como análise secundária, e usámos o teste de razão de verosimilhanças entre modelos aninhados como complemento. Não fixámos antes da análise uma margem de equivalência; por isso interpretamos a estimativa e o seu IC, sem declarar equivalência formal.
+
+**Pressupostos.** No modelo 4, verificámos a linearidade no logit de cada variável contínua (termo linear contra uma *spline* natural de 3 graus de liberdade, teste de razão de verosimilhanças), a multicolinearidade (fator de inflação da variância, VIF) e as observações influentes (distância de Cook acima de 4/n). Com `r n_mortes` mortes, o modelo 4 tem `r fmt(epv_m4, 1)` eventos por parâmetro, abaixo da regra prática de 10; mantivemo-lo porque é o comparador da questão, e discutimos o risco de sobreajustamento.
+
+**Análises de sensibilidade.** Repetimos a análise em dois cenários: S1, com a creatinina e a CPK na escala original; S2, com um desfecho de horizonte fixo, morte até aos 90 dias, excluindo os doentes que saíram do seguimento antes desse prazo sem morrer.
+
+O reporte segue a TRIPOD+AI (6). A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")`, com os pacotes tidyverse, gtsummary, broom, here, pROC, splines e car; as versões estão no anexo.
+
+## Resultados
+
+### Caracterização da amostra
+
+Dos `r n_total` doentes, `r n_mortes` (`r fmt(pct_mortes, 1)` %) morreram durante o seguimento (@tbl-amostra). Os doentes que morreram eram mais velhos, tinham a fração de ejeção mais baixa e a creatinina mais alta. A creatinina e a CPK tiveram distribuições muito assimétricas.
+
+```{r}
+#| label: tbl-amostra
+#| tbl-cap: "Caracterização dos doentes na admissão, por desfecho."
+dados |>
+  select(morte_f, age, sex, anaemia, diabetes, high_blood_pressure, smoking,
+         ejection_fraction, serum_creatinine, serum_sodium,
+         creatinine_phosphokinase, platelets, time) |>
+  tbl_summary(
+    by = morte_f,
+    label = list(
+      age ~ "Idade (anos)",
+      sex ~ "Sexo masculino",
+      anaemia ~ "Anemia",
+      diabetes ~ "Diabetes",
+      high_blood_pressure ~ "Hipertensão arterial",
+      smoking ~ "Fumador",
+      ejection_fraction ~ "Fração de ejeção (%)",
+      serum_creatinine ~ "Creatinina sérica (mg/dL)",
+      serum_sodium ~ "Sódio sérico (mEq/L)",
+      creatinine_phosphokinase ~ "CPK (mcg/L)",
+      platelets ~ "Plaquetas",
+      time ~ "Seguimento (dias)"
+    ),
+    digits = list(serum_creatinine ~ 2),
+    missing = "no"
+  ) |>
+  add_overall() |>
+  modify_header(label ~ "**Característica**")
+# Sem add_p(): testar cada linha não responde à questão do estudo.
+```
+
+### Coeficientes dos modelos
+
+No modelo 1, cada ponto percentual a mais de fração de ejeção multiplicou as *odds* de morte por `r fmt_ic(or_fe$estimate, or_fe$conf.low, or_fe$conf.high, 3)`, e cada duplicação da creatinina multiplicou-as por `r fmt_ic(or_cr$estimate, or_cr$conf.low, or_cr$conf.high)` (@tbl-or). Num modelo de predição, os OR individuais são secundários ao desempenho global; a equação de cada modelo está no anexo.
+
+```{r}
+#| label: tbl-or
+#| tbl-cap: "Odds ratios (IC 95 %) dos quatro modelos."
+rotulo_var <- c(
+  ejection_fraction = "Fração de ejeção (por 1 %)",
+  log2_creatinina = "Creatinina (por duplicação)",
+  age = "Idade (por ano)",
+  serum_sodium = "Sódio (por 1 mEq/L)",
+  anaemia = "Anemia", diabetes = "Diabetes",
+  high_blood_pressure = "Hipertensão arterial", sex = "Sexo masculino",
+  log2_cpk = "CPK (por duplicação)", plaquetas_100k = "Plaquetas (por 100 000)",
+  smoking = "Fumador"
+)
+imap(principal$ajustes, \(m, nome)
+     tidy(m, exponentiate = TRUE, conf.int = TRUE) |> mutate(modelo = nome)) |>
+  list_rbind() |>
+  filter(term != "(Intercept)") |>
+  mutate(or_ic = paste0(fmt(estimate), " (", fmt(conf.low), " a ", fmt(conf.high), ")"),
+         term = factor(term, levels = names(rotulo_var), labels = rotulo_var)) |>
+  select(term, modelo, or_ic) |>
+  pivot_wider(names_from = modelo, values_from = or_ic, values_fill = "—") |>
+  arrange(term) |>
+  rename(Variável = term, `Modelo 1` = M1, `Modelo 2` = M2,
+         `Modelo 3` = M3, `Modelo 4` = M4) |>
+  knitr::kable()
+```
+
+### Discriminação e calibração
+
+A AUC aparente aumentou com o número de variáveis, mas a vantagem diminuiu após a validação cruzada (@tbl-desempenho, @fig-auc). O otimismo foi `r fmt(v(disc, "M1", "otimismo"), 3)` no modelo 1 e `r fmt(v(disc, "M4", "otimismo"), 3)` no modelo 4. A AUC validada mais alta foi a do `r tolower(rotulo_modelo[melhor_cv])`, com `r fmt(max(disc$auc_cv), 3)`.
+
+```{r}
+#| label: tbl-desempenho
+#| tbl-cap: "Desempenho dos quatro modelos: AUC aparente e por validação cruzada; calibração das predições da validação cruzada."
+disc |>
+  left_join(calib, by = "modelo") |>
+  transmute(
+    Modelo = rotulo_modelo[modelo],
+    `AUC aparente` = fmt_ic(auc_ap, auc_ap_li, auc_ap_ls, 3),
+    `AUC validada` = fmt_ic(auc_cv, auc_cv_li, auc_cv_ls, 3),
+    Otimismo = fmt(otimismo, 3),
+    `Prevista / observada` = paste0(fmt(prevista, 3), " / ", fmt(observada, 3)),
+    `Declive de calibração` = fmt_ic(declive, declive_li, declive_ls)
+  ) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: fig-auc
+#| fig-cap: "AUC de cada modelo, aparente e por validação cruzada, com IC 95 %. A vantagem aparente dos modelos com mais variáveis diminui depois da validação."
+#| fig-alt: "Gráfico de pontos com intervalos: para cada um dos quatro modelos, a AUC aparente e a AUC por validação cruzada, com intervalo de confiança a 95 %."
+# Uma linha por modelo e por tipo de AUC (aparente ou validada), com os limites.
+dados_fig_auc <- bind_rows(
+  disc |> transmute(modelo, tipo = "Aparente", auc = auc_ap, li = auc_ap_li, ls = auc_ap_ls),
+  disc |> transmute(modelo, tipo = "Validação cruzada", auc = auc_cv, li = auc_cv_li, ls = auc_cv_ls)
+) |>
+  mutate(modelo = factor(rotulo_modelo[modelo], levels = rev(rotulo_modelo)))
+
+ggplot(dados_fig_auc, aes(x = auc, y = modelo, colour = tipo)) +
+  geom_pointrange(aes(xmin = li, xmax = ls),
+                  position = position_dodge(width = 0.5)) +
+  scale_colour_manual(values = c("Aparente" = "grey60", "Validação cruzada" = "#1f4e79")) +
+  scale_x_continuous(labels = scales::label_number(accuracy = 0.01, decimal.mark = ",")) +
+  labs(x = "AUC (IC 95 %)", y = NULL, colour = NULL) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+Na calibração, a média prevista coincidiu com a observada em todos os modelos. O declive afastou-se de 1 à medida que se acrescentaram variáveis: `r fmt_ic(v(calib, "M1", "declive"), v(calib, "M1", "declive_li"), v(calib, "M1", "declive_ls"))` no modelo 1 e `r fmt_ic(v(calib, "M4", "declive"), v(calib, "M4", "declive_li"), v(calib, "M4", "declive_ls"))` no modelo 4 (@fig-calibracao). Um declive abaixo de 1 significa que o modelo daria riscos demasiado extremos a doentes novos: demasiado altos aos de risco alto e demasiado baixos aos de risco baixo.
+
+```{r}
+#| label: fig-calibracao
+#| fig-cap: "Calibração por decis de risco previsto, com as predições da validação cruzada. A diagonal representa calibração perfeita."
+#| fig-alt: "Quatro gráficos, um por modelo, com o risco previsto no eixo horizontal e a proporção observada de mortes no eixo vertical, por decis, e a diagonal de calibração perfeita."
+dados_fig_calib <- imap(principal$p_cv, \(p, m)
+                        calibracao(tibble(y = principal$y, p = p)) |>
+                          mutate(modelo = rotulo_modelo[m])) |>
+  list_rbind()
+
+ggplot(dados_fig_calib, aes(x = prevista, y = observada)) +
+  geom_abline(linetype = "dashed", colour = "grey60") +
+  geom_line(colour = "grey40") +
+  geom_point(aes(size = n), colour = "#1f4e79") +
+  facet_wrap(~ modelo, nrow = 1) +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  scale_x_continuous(labels = scales::label_percent()) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(x = "Risco previsto", y = "Mortes observadas", size = "n") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Comparação com o modelo de 11 variáveis
+
+Sem validação, a diferença de AUC entre o modelo 1 e o modelo 4 era `r fmt_ic(d1_ap$dif, d1_ap$li, d1_ap$ls, 3)`. Com as predições da validação cruzada, passou a `r fmt_ic(d1$dif, d1$li, d1$ls, 3)` (@tbl-comparacao); o IC 95 % `r if (d1_inclui_zero) "inclui o zero" else "não inclui o zero"`. No teste de razão de verosimilhanças, as nove variáveis acrescentadas ao modelo 1 melhoraram o ajuste (χ² = `r fmt(lrt_m1$chi2, 1)`, `r lrt_m1$gl` gl, `r fmt_p(lrt_m1$p)`), o que mostra que há informação nelas, sem dizer quanto melhora a previsão em doentes novos.
+
+```{r}
+#| label: tbl-comparacao
+#| tbl-cap: "Diferença de AUC em relação ao modelo 4 (IC 95 % por bootstrap) e teste de razão de verosimilhanças."
+comp_ap |>
+  select(comparacao, d_ap = dif, li_ap = li, ls_ap = ls) |>
+  left_join(comp_cv, by = "comparacao") |>
+  left_join(lrt |> rename(p_lrt = p), by = "comparacao") |>
+  transmute(
+    Comparação = paste(rotulo_modelo[comparacao], "vs modelo 4"),
+    `ΔAUC aparente` = fmt_ic(d_ap, li_ap, ls_ap, 3),
+    `ΔAUC validada` = fmt_ic(dif, li, ls, 3),
+    `Razão de verosimilhanças` = paste0("χ² = ", fmt(chi2, 1), "; ", gl, " gl; ", fmt_p(p_lrt))
+  ) |>
+  knitr::kable()
+```
+
+### Pressupostos
+
+`r if (length(nao_lineares) > 0) paste0("A relação com o logit não foi linear para: ", paste(nao_lineares, collapse = ", "), " (p < 0,05; detalhes no anexo).") else "Não houve evidência de não-linearidade no logit em nenhuma variável contínua (anexo)."` O VIF máximo foi `r fmt(max(vif_m4), 2)`, sem sinais de multicolinearidade. Houve `r n_cook` doentes com distância de Cook acima de 4/n; mantivemo-los, porque não havia erros de registo que justificassem excluí-los.
+
+### Análises de sensibilidade
+
+A diferença entre o modelo 1 e o modelo 4 manteve a mesma direção nas duas análises (@tbl-sensibilidade). Com a escala original (S1), foi `r fmt_ic(sens_d1$S1$dif, sens_d1$S1$li, sens_d1$S1$ls, 3)`. No horizonte de 90 dias (S2), foi `r fmt_ic(sens_d1$S2$dif, sens_d1$S2$li, sens_d1$S2$ls, 3)`, em `r n_90` doentes, com `r mortes_90` mortes e `r n_excl_90` excluídos por terem saído do seguimento antes dos 90 dias sem morrer.
+
+```{r}
+#| label: tbl-sensibilidade
+#| tbl-cap: "AUC validada de cada modelo e diferença do modelo 1 em relação ao modelo 4 (IC 95 %), na análise principal e nas análises de sensibilidade."
+nomes_analise <- c(Principal = "Principal (log2)", S1 = "S1: escala original",
+                   S2 = "S2: morte até 90 dias")
+imap(sens_disc, \(tab, nome)
+     tab |>
+       select(modelo, auc_cv) |>
+       mutate(auc_cv = fmt(auc_cv, 3)) |>
+       pivot_wider(names_from = modelo, values_from = auc_cv) |>
+       mutate(Análise = nomes_analise[[nome]],
+              `Δ modelo 1 − modelo 4` = fmt_ic(sens_d1[[nome]]$dif,
+                                               sens_d1[[nome]]$li,
+                                               sens_d1[[nome]]$ls, 3))) |>
+  list_rbind() |>
+  select(Análise, `Modelo 1` = M1, `Modelo 2` = M2, `Modelo 3` = M3,
+         `Modelo 4` = M4, `Δ modelo 1 − modelo 4`) |>
+  knitr::kable()
+```
+
+## Discussão
+
+Nesta coorte, um modelo de regressão logística apenas com fração de ejeção e creatinina sérica teve, depois de corrigido o otimismo, uma discriminação próxima da do modelo com onze variáveis, com uma diferença de AUC de `r fmt_ic(d1$dif, d1$li, d1$ls, 3)`. A vantagem do modelo completo era sobretudo aparente: o seu otimismo foi maior, e o declive de calibração abaixo de 1 é o sobreajustamento que se espera com `r fmt(epv_m4, 1)` mortes por parâmetro (7).
+
+Em termos clínicos, a AUC é a probabilidade de o modelo dar um risco mais alto ao doente que morreu do que ao que sobreviveu, num par escolhido ao acaso. Uma diferença de `r fmt(abs(d1$dif), 3)` significa que o modelo com duas variáveis ordena bem `r fmt(100 * abs(d1$dif), 1)` pares em cada 100 a `r if (d1$dif < 0) "menos" else "mais"` do que o modelo completo. Este ganho dificilmente compensa recolher e introduzir mais nove variáveis. O limite inferior do IC (`r fmt(d1$li, 3)`) mostra, porém, que os dados são compatíveis com uma perda maior, de `r fmt(100 * abs(d1$li), 1)` pares em cada 100. A evidência é compatível com a hipótese de que duas variáveis bastam, mas não a demonstra com folga.
+
+A idade, que entra no modelo 2, não acrescenta custo de recolha e melhorou o ajuste. Um modelo com três ou quatro variáveis pode ser um compromisso melhor do que o de duas, desde que essa hipótese seja testada noutros dados e não escolhida a partir destes.
+
+Estes resultados estão de acordo com Chicco e Jurman (5), que identificaram a creatinina e a fração de ejeção como as variáveis mais informativas desta base, e com a análise original (4), em que a idade, a fração de ejeção e a creatinina estavam entre os fatores associados à mortalidade. Acrescentam a calibração e a correção do otimismo. As AUC validadas são da mesma ordem das reportadas para scores de insuficiência cardíaca validados em coortes muito maiores (2,3).
+
+### Limitações
+
+**Poucos eventos.** Com `r n_mortes` mortes, os IC da diferença de AUC são largos, o que torna difícil demonstrar que os modelos são equivalentes. O modelo 4 está abaixo da regra de 10 eventos por parâmetro, o que exagera o seu desempenho aparente; a validação interna corrige este efeito, mas não o elimina.
+
+**Seguimento desigual.** O desfecho binário trata como sobreviventes doentes seguidos apenas alguns dias. Isto subestima o risco real e, provavelmente, atenua a AUC de todos os modelos por igual. Na análise a 90 dias (S2), a comparação entre modelos manteve-se.
+
+**Dois hospitais, um ano, sem validação externa.** A base inclui só doentes internados em classe NYHA III–IV com disfunção sistólica, de uma cidade do Paquistão, em 2015. A conclusão só se transporta, com cautela, para doentes semelhantes. Noutras populações, sobretudo com fração de ejeção preservada ou em ambulatório, o desempenho é desconhecido, e a calibração é a medida que mais se degrada noutro contexto.
+
+**Confundimento e variáveis em falta.** A base não inclui marcadores de prognóstico importantes, como os peptídeos natriuréticos, nem a medicação. Um modelo completo com essas variáveis poderia superar o modelo de duas variáveis, o que tornaria a nossa conclusão favorável demais ao modelo simples.
+
+**Possíveis valores imputados.** Alguns valores de CPK e de plaquetas repetem-se muitas vezes, o que sugere imputação não documentada. Valores imputados atenuam as associações e afetam sobretudo o modelo 4, que usa estas variáveis.
+
+**Seleção circular.** As duas variáveis do modelo 1 foram escolhidas por um estudo feito nesta mesma base (5). Isto favorece o modelo 1, e só a validação externa resolve o problema.
+
+### Próximos passos
+
+Para usar o modelo noutro hospital, seria preciso validá-lo externamente numa coorte independente e recalibrar a ordenada na origem à mortalidade local. Também seria preciso definir um horizonte temporal fixo, por exemplo a um ano, ou usar um modelo de sobrevivência que aproveite o tempo de seguimento sem o usar como preditor. A seguir, testaríamos um modelo com a idade acrescentada às duas variáveis.
+
+### Conclusão
+
+Nesta coorte, depois de corrigido o otimismo, um modelo com fração de ejeção e creatinina sérica discrimina quase tanto como um modelo com onze variáveis e está pelo menos tão bem calibrado. A diferença observada é pequena, mas a incerteza não exclui uma perda relevante. Antes de qualquer uso clínico, o modelo precisa de validação externa.
+
+## Declaração de uso de inteligência artificial
+
+Declaramos que na elaboração deste trabalho foi utilizada a seguinte ferramenta de inteligência artificial generativa:
+
+- Ferramenta: Claude (Anthropic), modelo Claude Opus 5.5, através de claude.ai e do Claude Code.
+- Tipo de assistência: [CONFIRMAR EM GRUPO] explicação de conceitos estatísticos; configuração do Git e do GitHub e escrita do guia de Git, do README e da lista de tarefas; apoio à escrita e correção do código R da validação cruzada, da calibração e da comparação de modelos; verificação cruzada de resultados; rascunho e revisão do texto do relatório.
+- Nível HEAT-AI do uso: [limitado / alto — DECIDIR EM GRUPO; a política da UC espera "limitado" no trabalho]
+- Secções em que foi aplicada: [CONFIRMAR] código de análise; Métodos; Resultados; Discussão; revisão de todo o texto.
+- Prompts utilizados: [lista resumida por elemento do grupo; os prompts completos num anexo]. Exemplos: «adapta o script da sessão 4 ao modelo com creatinina sérica e fração de ejeção»; «verifica se os números deste script batem certo»; «corrige o relatório para seguir o guião, a grelha e o modelo do docente».
+- Verificações humanas efetuadas: [COMPLETAR] código corrido e renderizado pelo grupo numa sessão nova de R; números comparados com os scripts iniciais de cada modelo; referências confirmadas na fonte. O que corrigimos ou rejeitámos, e porquê: (1) o plano inicial tinha um modelo com 12 variáveis, mas a IA notou que só há 11 preditores sem `time`, e reduzimos o modelo 4 para 11; (2) uma versão do relatório gerada pela IA afirmava que a escala logarítmica e uma margem de não-inferioridade de −0,05 tinham sido fixadas antes da análise, o que não era verdade; retirámos a margem e reescrevemos a frase; (3) rejeitámos análises que nenhum de nós conseguia explicar (validação cruzada repetida 20 vezes, *bootstrap* do otimismo e *splines* como análise de sensibilidade) e voltámos ao método da sessão 4; (4) a IA não conseguiu confirmar um valor de *hazard ratio* do estudo original e não o usámos.
+- Período de utilização: [de dd/mm a 22/11/2026]
+
+O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pela ferramenta. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
+
+## Referências
+
+1. Savarese G, Becher PM, Lund LH, Seferovic P, Rosano GMC, Coats AJS. Global burden of heart failure: a comprehensive and updated review of epidemiology. Cardiovasc Res. 2023;118(17):3272-87.
+2. Levy WC, Mozaffarian D, Linker DT, Sutradhar SC, Anker SD, Cropp AB, et al. The Seattle Heart Failure Model: prediction of survival in heart failure. Circulation. 2006;113(11):1424-33.
+3. Pocock SJ, Ariti CA, McMurray JJV, Maggioni A, Køber L, Squire IB, et al. Predicting survival in heart failure: a risk score based on 39 372 patients from 30 studies. Eur Heart J. 2013;34(19):1404-13.
+4. Ahmad T, Munir A, Bhatti SH, Aftab M, Raza MA. Survival analysis of heart failure patients: a case study. PLoS One. 2017;12(7):e0181001.
+5. Chicco D, Jurman G. Machine learning can predict survival of patients with heart failure from serum creatinine and ejection fraction alone. BMC Med Inform Decis Mak. 2020;20:16.
+6. Collins GS, Moons KGM, Dhiman P, Riley RD, Beam AL, Van Calster B, et al. TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods. BMJ. 2024;385:e078378.
+7. Steyerberg EW. Clinical prediction models: a practical approach to development, validation, and updating. 2.ª ed. Cham: Springer; 2019.
+8. DeLong ER, DeLong DM, Clarke-Pearson DL. Comparing the areas under two or more correlated receiver operating characteristic curves: a nonparametric approach. Biometrics. 1988;44(3):837-45.
+9. Van Calster B, McLernon DJ, van Smeden M, Wynants L, Steyerberg EW. Calibration: the Achilles heel of predictive analytics. BMC Med. 2019;17(1):230.
+
+## Anexo: pressupostos, equações e ambiente de execução
+
+```{r}
+#| label: anexo-linearidade
+linearidade |>
+  mutate(p = fmt_p(p)) |>
+  knitr::kable(col.names = c("Variável (modelo 4)", "Termo linear vs spline natural (3 gl)"),
+               caption = "Linearidade no logit (teste de razão de verosimilhanças).")
+```
+
+```{r}
+#| label: anexo-vif
+tibble(variavel = names(vif_m4), vif = fmt(vif_m4, 2)) |>
+  knitr::kable(col.names = c("Variável", "VIF"),
+               caption = "Fatores de inflação da variância (modelo 4).")
+```
+
+```{r}
+#| label: anexo-equacoes
+# Equação de cada modelo (pedida pela TRIPOD+AI):
+# probabilidade = 1 / (1 + exp(-(b0 + b1*x1 + ...)))
+imap(principal$ajustes, \(m, nome) tidy(m) |> mutate(modelo = nome)) |>
+  list_rbind() |>
+  transmute(Modelo = rotulo_modelo[modelo], Termo = term,
+            `β` = fmt(estimate, 4), `Erro-padrão` = fmt(std.error, 4)) |>
+  knitr::kable(caption = "Coeficientes dos modelos (escala logit).")
+```
+
+```{r}
+#| label: sessao
+#| code-fold: false
+# sessionInfo(): versões de R, sistema e pacotes, para documentar o ambiente.
+sessionInfo()
+```
