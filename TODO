@@ -1,0 +1,135 @@
+Trabalho de grupo de MAIS 2026/27, questão tipo B (avaliar um modelo de predição)
+Entrega: 22/11/2026 às 23h59, no Moodle, com o .html do relatório e o .zip do projeto
+Atraso: menos 1 valor por dia; depois de 26/11 o trabalho não é aceite
+Nota (20 valores): questão e desenho 4 · análise estatística 6 · reprodutibilidade 4 · comunicação 4 · uso de IA 2
+Estado em 16/11/2026, 23h. Ponham o vosso nome como etiqueta nas tarefas que ficarem convosco (ex.: @raquel)
+
+Documentos da UC:
+  Guião: https://tiagojacinto.eu/mais-2627/avaliacao/guiao-trabalho.html
+  Grelha de correção: https://tiagojacinto.eu/mais-2627/avaliacao/criterios.html
+  Modelo do relatório: https://tiagojacinto.eu/mais-2627/avaliacao/modelo-relatorio.html
+  Lista de verificação da entrega: https://tiagojacinto.eu/mais-2627/avaliacao/lista-entrega.html
+  Política de IA: https://tiagojacinto.eu/mais-2627/politica-ia.html
+  Sessão 4, código da validação: https://tiagojacinto.eu/mais-2627/sessoes/04-validacao-ia/guiao.html
+  Sessão 4, projeto completo (sessao4.R com calibracao() e resumo_calibracao()): https://tiagojacinto.eu/mais-2627/downloads/mais-sessao4.zip
+
+Plano até à entrega:
+  Ter 17/11: guardar no Git; fechar a secção 3 (pressupostos e fórmulas); secções 4 e 5 (função, AUC, validação cruzada)
+  Qua 18/11: secções 6, 7, 8 e 9 (comparação 1 contra 4, calibração, sensibilidade, figuras)
+  Qui 19/11 e Sex 20/11: relatório em Quarto (passar o código do analise.R e escrever o texto)
+  Sáb 21/11: revisão cruzada, declaração de IA, teste do .zip numa pasta limpa
+  Dom 22/11: margem; submeter cedo
+
+Já feito:
+  ✔ Repositório no GitHub com a main protegida, Pull Requests e guia de Git @done
+  ✔ Projeto RStudio partilhado (projeto_mais.Rproj) @done
+  ✔ Base em data/raw/ sem alterações (299 doentes, 96 mortes, sem valores em falta) @done
+  ✔ Questão do tipo B escrita em PICO, com os quatro elementos (info/PLAN/project_plan.md) @done
+  ✔ Quatro modelos definidos, cada um com um responsável @done
+  ✔ time fora de todos os modelos (é a armadilha que a grelha mais penaliza) @done
+  ✔ Caminhos com here() em todos os scripts @done
+  ✔ Regressão logística, odds ratios e curva ROC nos quatro scripts @done
+    AUC aparente, calculada nos mesmos dados do ajuste (otimista até haver validação interna)
+    Modelo 1 (model_1.R): 2 variáveis, AUC 0,761
+    Modelo 2 (model_2.R): 4 variáveis, AUC 0,790
+    Modelo 3 (model_3.R): 8 variáveis, AUC 0,800
+    Modelo 4 (model_4.R): 11 variáveis, AUC 0,809
+  ✔ Comparação principal decidida: modelo 1 contra modelo 4; os modelos 2 e 3 são análises secundárias @done(26-11-16)
+  ✔ Pasta scripts/ criada, com o scripts/analise.R organizado por secções (0 a 9) @done(26-11-16)
+  ✔ analise.R, secções 0 a 2: pacotes, importação, desfecho y, Table 1 com gtsummary estratificada pelo desfecho @done(26-11-16)
+
+
+1. Corrigir os scripts dos modelos (prioridade baixa: o analise.R substitui-os):
+  ✔ model_2.R: ci.auc(roc_mod) passou a ci.auc(curva_roc); comentário com o IC escrito à mão apagado @done
+  ✔ model_1.R: comentários copiados do modelo 4 reescritos @done(26-11-16 18:21)
+  ✔ model_1.R e model_4.R: gralha "desfediabetescho" @done(26-11-16 14:35)
+  ✔ Odds ratios com IC 95 % (confint()) e AUC com IC (ci.auc()) nos quatro modelos @done(26-11-16 18:23)
+  ✔ model_1.R, linhas 44–45: os OR escritos à mão (0,93 e 1,94) são os do modelo 4; o modelo 1 dá 0,94 e 2,12. Apagar os números do comentário @low @done(26-11-16 23:20)
+  ✔ model_1.R, linha 27, e model_4.R, linha 28: "valor binário" → "desfecho binário" @low @done(26-11-16 23:20)
+
+2. Completar a análise no scripts/analise.R (tipo B):
+  Sem discriminação, calibração e validação interna, a análise não passa de Suficiente na grelha
+  Testar sempre com Session → Restart R e correr o script todo (o .RData esconde erros)
+
+  Secções 0 a 2 (pormenores que faltam):
+  ☐ Comentário junto a "Sexo masculino": a codificação 1 = masculino foi inferida pelas contagens (194 com 1 nos dados = 194 homens em Ahmad et al. 2017); nenhuma fonte a documenta
+  ☐ Calcular a mediana e a amplitude do seguimento (time) para o texto; devem bater com os 4–285 dias de Ahmad
+  ☐ Linhas 20 e 28: os comentários dizem "dados" em vez de dataset
+
+  Secção 3, pressupostos e forma das variáveis:
+  ✔ 3.1 Histogramas da creatinina e da CPK, na escala original e em log @done(26-11-16)
+  ✔ 3.2 Gráfico do logit por decis da creatinina (função logit_por_decil()) @done(26-11-16)
+  ☐ 3.3 Teste da forma da creatinina no modelo 1: anova(linear, ns(df = 3), test = "LRT") e AIC(linear, log, ns). Escrever a decisão e o porquê num comentário @critical ← COMEÇAR AQUI
+    Decidir pelo gráfico e pelo teste, nunca pela AUC
+  ☐ Repetir decis + teste para a fração de ejeção (modelo 1) e para as outras contínuas do modelo 4: idade, sódio, CPK, plaquetas
+  ☐ Multicolinearidade: car::vif() no modelo 4 (o car não está no Setup MAIS: listar no início do .qmd)
+  ☐ Escrever as fórmulas finais f1 a f4 uma só vez (com y e a forma decidida; nunca time)
+  ☐ Mortes por parâmetro de cada modelo (96 / n.º de parâmetros); o modelo 4 tem cerca de 8,7, abaixo da regra das 10: justificar nos métodos e discutir o sobreajustamento
+
+  Secção 4, os modelos e a AUC aparente:
+  ☐ Uma função que recebe a fórmula e os dados, ajusta o glm() e devolve as probabilidades previstas (serve aos quatro modelos e à validação cruzada) @critical
+  ☐ AUC aparente com IC 95 % (ci.auc()) nos quatro modelos; OR com IC numa tabela secundária
+
+  Secção 5, validação interna:
+  ☐ Validação cruzada em 10 partes com set.seed() e as mesmas partes para os quatro modelos (código no sessao4.R da sessão 4) @critical
+  ☐ Reportar a AUC aparente, a AUC validada e o otimismo (a diferença entre as duas)
+
+  Secção 6, comparação principal: modelo 1 contra modelo 4:
+  ☐ Diferença de AUC (modelo 4 − modelo 1) com IC 95 %, sobre as previsões da validação cruzada: roc.test(..., paired = TRUE, method = "delong") devolve o IC em $conf.int @critical
+  ☐ Decidir em grupo, ANTES de ver o resultado, que diferença de AUC é clinicamente desprezável
+    Um p > 0,05 não prova que os modelos são iguais; é o IC que mostra que diferenças são compatíveis com os dados
+
+  Secção 7, calibração:
+  ☐ Sobre as previsões da validação cruzada: calibracao() (gráfico por decis) e resumo_calibracao() (média prevista contra observada, ordenada na origem, declive) @critical
+  ☐ IC do declive e da ordenada com confint.default() (o resumo_calibracao() da sessão não os dá)
+    Nos dados de ajuste dão 0 e 1 por construção
+
+  Secção 8, análise de sensibilidade (distingue os trabalhos excelentes):
+  ☐ Escolher em função da secção 3:
+    Se a creatinina (e/ou a CPK) passar a log na análise principal → opção B: horizonte de 90 dias
+      Exclui 43 doentes (vivos e seguidos menos de 90 dias); ficam 256 com 69 mortes; 27 mortes depois dos 90 dias passam a sobreviventes; o modelo 4 fica com cerca de 6 mortes por parâmetro
+    Se ficarem lineares → opção A: creatinina (e CPK) em log
+  ☐ Repetir as secções 5 a 7 e comparar com a análise principal
+
+  Secção 9, figuras:
+  ☐ Curvas ROC dos modelos 1 e 4 (validadas) no mesmo gráfico, ou AUC com IC por modelo
+  ☐ Gráfico de calibração dos dois modelos
+  ☐ Eixos e legendas em português, com unidades
+
+3. Escrever o relatório em Quarto (scripts/relatorio.qmd):
+  ☐ Descarregar o modelo para scripts/ (é onde a lista de entrega o espera) @critical
+    https://tiagojacinto.eu/mais-2627/modelos/relatorio-trabalho.qmd
+  ☐ Adaptar o modelo: título, autores, ficheiro de dados e variáveis; apagar os exemplos de hipertensão e o texto de instruções
+  ☐ Passar o código do scripts/analise.R para blocos do .qmd (preparação dos dados separada da análise, sem blocos repetidos)
+  ☐ Números do texto em código inline, com vírgula decimal (uma pequena função de formatação), nunca escritos à mão
+  ☐ Introdução: o problema, o que se sabe (com referências), a lacuna, o objetivo e a questão em PICO
+    Confirmem no artigo de Chicco e Jurman o que avaliaram e o que ficou por avaliar (por exemplo, a calibração)
+  ☐ Métodos
+    ☐ Dados: origem (Ahmad et al. 2017; UCI, licença CC BY 4.0, com a ligação), coorte de dois hospitais de Faisalabad, abril a dezembro de 2015; uma linha por doente; n = 299; sem exclusões; sem valores em falta (dizê-lo)
+    ☐ Desfecho: morte durante o seguimento (4 a 285 dias); porque é que o time fica fora dos modelos
+    ☐ Variáveis de cada modelo, unidades conforme a fonte, codificação do sexo inferida por contagem
+    ☐ Análise: principal (1 contra 4) e secundárias (2 e 3); pressupostos e forma das variáveis; mortes por parâmetro; validação cruzada; calibração; sensibilidade
+    ☐ Software, com as versões de R e dos pacotes
+    ☐ Seguir a norma de reporte TRIPOD+AI
+  ☐ Resultados: Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figura; IC interpretados no texto
+  ☐ Discussão
+    ☐ O resultado principal numa frase
+    ☐ Magnitude da diferença em termos clínicos (não só em AUC)
+    ☐ Comparação com Chicco e Jurman (2020) e com Ahmad et al. (2017)
+    ☐ Limitações, cada uma com o efeito provável sobre a conclusão: seguimento desigual; dois hospitais e um ano; sem validação externa; variáveis que a base não tem; número de mortes; momento de medição das variáveis não documentado (a UCI diz "during their follow-up period")
+    ☐ O que seria preciso para usar o modelo noutro hospital e o que fariam a seguir
+  ☐ Resumo (abstract), escrito no fim: 250 a 350 palavras, seis movimentos, resultados com números, sem referências nem tabelas
+  ☐ Declaração de uso de IA dentro do .qmd, antes das Referências (o modelo já tem o espaço)
+  ☐ Referências em estilo Vancouver, numeradas pela ordem de citação e todas verificadas na fonte
+  ☐ Anexo com sessionInfo() (já vem no modelo)
+  ☐ Extensão total de 2000 a 3500 palavras, contando o abstract e sem contar código, anexos e referências
+  ☐ Figuras e tabelas com legenda e referidas no texto
+
+4. Declaração de uso de IA:
+  ☐ Preencher os sete campos: ferramenta, tipo de assistência, nível HEAT-AI, secções, prompts, verificações humanas e período de utilização (o Themis gera a declaração: https://tiagojacinto.eu/fmup-ia/themis/)
+  ☐ Cada elemento lista os prompts que usou, registados à medida que os usa
+    Registos já existentes: o Claude (Git, GitHub, guia de Git, README, TODO); a conversa da Raquel em "Instruções do projeto - Claude.mhtml", na branch raquelmcbraganca-patch-1; o registo das sessões do João com o Claude (professor-mais), desde 16/11
+    Escrito pela IA a pedido do João e por ele revisto: comentários das secções 3.1 e 3.2 do analise.R; função logit_por_decil() e código do teste da forma da creatinina
+  ☐ Mostrar o que o grupo corrigiu ou rejeitou numa resposta da IA, e porquê (dá o nível Excelente neste critério)
+    Exemplos de 16/11: o João rejeitou trabalhar numa branch; questionou a Table 1 estratificada pelo desfecho comparando-a com a sessão 4; questionou a relevância dos histogramas
+

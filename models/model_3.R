@@ -54,8 +54,15 @@ summary(modelo)
 # Conclusão: idade, função renal e função cardíaca são os principais fatores
 # associados à morte; as 4 variáveis acrescentadas ao modelo 2 (anemia,
 # hipertensão, diabetes e sexo) não mostraram evidência de efeito.
+
+
+round(exp(cbind(OR = coef(modelo), confint(modelo))), 3)
+
 # 3. Curva ROC --------------------------------------------------------
 #
 # Cria a curva ROC e mostra num gráfico
 curva_roc <- roc(dataset$DEATH_EVENT, dataset$p)
 plot(curva_roc, print.auc = TRUE)
+
+
+ci.auc(curva_roc)

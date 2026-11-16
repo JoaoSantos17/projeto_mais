@@ -79,5 +79,4 @@ plot(curva_roc, print.auc = TRUE)
 
 #AUC = 0.790 
 
-ci.auc(roc_mod)
-#O modelo apresentou discriminação aceitável a boa, com AUC aparente de 0,790 (IC 95% 0,737–0,848; método de DeLong), significativamente superior ao acaso.
+ci.auc(curva_roc)

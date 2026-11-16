@@ -25,7 +25,7 @@ dataset |> count(DEATH_EVENT)
 
 # 2. O modelo e as probabilidades -------------------------------------------
 #
-# A regressão logística estima a probabilidade de um desfediabetescho binário
+# A regressão logística estima a probabilidade de um valor binário
 # (morte ou não) a partir de 11 variáveis. 
 
 # glm(): ajusta uma regressão logística com as 11 variáveis do internamento.
@@ -57,6 +57,7 @@ summary(modelo)
 # Conclusão: idade, função renal e função cardíaca são os principais fatores
 # associados à morte; a CPK também é significativa, mas com evidência mais fraca
 
+round(exp(cbind(OR = coef(modelo), confint(modelo))), 3)
 
 
 # 3. Curva ROC --------------------------------------------------------
@@ -64,6 +65,8 @@ summary(modelo)
 # Cria a curva ROC e mostra num gráfico
 curva_roc <- roc(dataset$DEATH_EVENT, dataset$p)
 plot(curva_roc, print.auc = TRUE)
+
+ci.auc(curva_roc)
 
 
 
