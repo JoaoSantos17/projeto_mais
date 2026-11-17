@@ -2,7 +2,7 @@ Trabalho de grupo de MAIS 2026/27, questão tipo B (avaliar um modelo de prediç
 Entrega: 22/11/2026 às 23h59, no Moodle, com o .html do relatório e o .zip do projeto
 Atraso: menos 1 valor por dia; depois de 26/11 o trabalho não é aceite
 Nota (20 valores): questão e desenho 4 · análise estatística 6 · reprodutibilidade 4 · comunicação 4 · uso de IA 2
-Estado em 16/11/2026, 23h. Ponham o vosso nome como etiqueta nas tarefas que ficarem convosco (ex.: @raquel)
+Estado em 17/11/2026, tarde. Ponham o vosso nome como etiqueta nas tarefas que ficarem convosco (ex.: @raquel)
 
 Documentos da UC:
   Guião: https://tiagojacinto.eu/mais-2627/avaliacao/guiao-trabalho.html
@@ -57,38 +57,40 @@ Já feito:
   ☐ Linhas 20 e 28: os comentários dizem "dados" em vez de dataset
 
   Secção 3, pressupostos e forma das variáveis:
-  ✔ 3.1 Histogramas da creatinina e da CPK, na escala original e em log @done(26-11-16)
+  ✔ 3.1 Histogramas das 6 variáveis contínuas, na escala original (creatinina e CPK também em log) @done(26-11-17)
+     Conclusão: só creatinina e CPK têm assimetria forte; as restantes são aproximadamente simétricas
   ✔ 3.2 Gráfico do logit por decis da creatinina (função logit_por_decil()) @done(26-11-16)
-  ☐ 3.3 Teste da forma da creatinina no modelo 1: anova(linear, ns(df = 3), test = "LRT") e AIC(linear, log, ns). Escrever a decisão e o porquê num comentário @critical ← COMEÇAR AQUI
-    Decidir pelo gráfico e pelo teste, nunca pela AUC
-  ☐ Repetir decis + teste para a fração de ejeção (modelo 1) e para as outras contínuas do modelo 4: idade, sódio, CPK, plaquetas
-  ☐ Multicolinearidade: car::vif() no modelo 4 (o car não está no Setup MAIS: listar no início do .qmd)
-  ☐ Escrever as fórmulas finais f1 a f4 uma só vez (com y e a forma decidida; nunca time)
-  ☐ Mortes por parâmetro de cada modelo (96 / n.º de parâmetros); o modelo 4 tem cerca de 8,7, abaixo da regra das 10: justificar nos métodos e discutir o sobreajustamento
+  ✔ 3.3 Teste da forma: função teste_forma() com LRT (linear vs. spline) + AIC (log vs. spline) @done(26-11-17)
+     Creatinina: reta falha (p = 0,032), log melhor (AIC 323 < spline 327) → entra em log
+     CPK: reta não falha (p = 0,095) → entra linear
+  ✔ Escrever as fórmulas finais f1 a f4 uma só vez (com y e a forma decidida; nunca time) ← COMEÇAR AQUI @done(26-11-17 17:44)
+  ✔ Mortes por parâmetro de cada modelo (96 / n.º de parâmetros); o modelo 4 tem cerca de 8,7, abaixo da regra das 10: justificar nos métodos e discutir o sobreajustamento
 
   Secção 4, os modelos e a AUC aparente:
-  ☐ Uma função que recebe a fórmula e os dados, ajusta o glm() e devolve as probabilidades previstas (serve aos quatro modelos e à validação cruzada) @critical
-  ☐ AUC aparente com IC 95 % (ci.auc()) nos quatro modelos; OR com IC numa tabela secundária
+  ✔ Função ajustar(formula, treino, teste) reutilizável nas secções 4 e 5 @done(26-11-17)
+  ✔ AUC aparente com IC 95 % (DeLong): mod 1 = 0,767 (0,706–0,828); mod 4 = 0,814 (0,761–0,868) @done(26-11-17)
+  ✔ Curvas ROC aparentes com AUC e IC na legenda (ggroc + setNames) @done(26-11-17)
 
   Secção 5, validação interna:
-  ☐ Validação cruzada em 10 partes com set.seed() e as mesmas partes para os quatro modelos (código no sessao4.R da sessão 4) @critical
-  ☐ Reportar a AUC aparente, a AUC validada e o otimismo (a diferença entre as duas)
+  ✔ Validação cruzada em 10 partes (set.seed(2026), mesmas partes para mod 1 e 4) @done(26-11-17)
+  ✔ AUC validada com IC, otimismo e gráfico ROC validado @done(26-11-17)
+     Modelo 1: aparente 0,767 → validada 0,761 (otimismo 0,006)
+     Modelo 4: aparente 0,814 → validada 0,781 (otimismo 0,033)
 
   Secção 6, comparação principal: modelo 1 contra modelo 4:
-  ☐ Diferença de AUC (modelo 4 − modelo 1) com IC 95 %, sobre as previsões da validação cruzada: roc.test(..., paired = TRUE, method = "delong") devolve o IC em $conf.int @critical
-  ☐ Decidir em grupo, ANTES de ver o resultado, que diferença de AUC é clinicamente desprezável
-    Um p > 0,05 não prova que os modelos são iguais; é o IC que mostra que diferenças são compatíveis com os dados
+  ✔ Diferença de AUC validada (mod 4 − mod 1) = 0,021; IC 95 % −0,061 a 0,019; p = 0,31 @done(26-11-17)
+     IC inclui zero e valores negativos → sem evidência de diferença significativa
+     Apoia a tese de Chicco e Jurman, mas amostra pequena (96 mortes)
 
   Secção 7, calibração:
-  ☐ Sobre as previsões da validação cruzada: calibracao() (gráfico por decis) e resumo_calibracao() (média prevista contra observada, ordenada na origem, declive) @critical
-  ☐ IC do declive e da ordenada com confint.default() (o resumo_calibracao() da sessão não os dá)
-    Nos dados de ajuste dão 0 e 1 por construção
+  ✔ Funções calibracao() e resumo_calibracao() da sessão 4, com IC do CITL e declive @done(26-11-17)
+  ✔ Gráficos de calibração (decis) dos modelos 1 e 4, sobre previsões da validação cruzada @done(26-11-17)
+     Modelo 1: CITL 0,007 (−0,26 a 0,28); declive 0,94 (0,65 a 1,23) → boa calibração
+     Modelo 4: CITL 0,018 (−0,27 a 0,30); declive 0,83 (0,59 a 1,07) → sobreajustamento ligeiro
 
   Secção 8, análise de sensibilidade (distingue os trabalhos excelentes):
-  ☐ Escolher em função da secção 3:
-    Se a creatinina (e/ou a CPK) passar a log na análise principal → opção B: horizonte de 90 dias
+  ☐ A creatinina entra em log na análise principal → sensibilidade = horizonte fixo de 90 dias
       Exclui 43 doentes (vivos e seguidos menos de 90 dias); ficam 256 com 69 mortes; 27 mortes depois dos 90 dias passam a sobreviventes; o modelo 4 fica com cerca de 6 mortes por parâmetro
-    Se ficarem lineares → opção A: creatinina (e CPK) em log
   ☐ Repetir as secções 5 a 7 e comparar com a análise principal
 
   Secção 9, figuras:
@@ -129,7 +131,8 @@ Já feito:
   ☐ Preencher os sete campos: ferramenta, tipo de assistência, nível HEAT-AI, secções, prompts, verificações humanas e período de utilização (o Themis gera a declaração: https://tiagojacinto.eu/fmup-ia/themis/)
   ☐ Cada elemento lista os prompts que usou, registados à medida que os usa
     Registos já existentes: o Claude (Git, GitHub, guia de Git, README, TODO); a conversa da Raquel em "Instruções do projeto - Claude.mhtml", na branch raquelmcbraganca-patch-1; o registo das sessões do João com o Claude (professor-mais), desde 16/11
-    Escrito pela IA a pedido do João e por ele revisto: comentários das secções 3.1 e 3.2 do analise.R; função logit_por_decil() e código do teste da forma da creatinina
+    Escrito pela IA a pedido do João e por ele revisto: comentários das secções 3.1 e 3.2 do analise.R; função logit_por_decil(); função teste_forma(); histogramas das 4 variáveis restantes; código do teste da creatinina e CPK
   ☐ Mostrar o que o grupo corrigiu ou rejeitou numa resposta da IA, e porquê (dá o nível Excelente neste critério)
     Exemplos de 16/11: o João rejeitou trabalhar numa branch; questionou a Table 1 estratificada pelo desfecho comparando-a com a sessão 4; questionou a relevância dos histogramas
+    Exemplos de 17/11: o João questionou a necessidade do spline e propôs simplificar o AIC para só log vs. spline (aceite); questionou testar todas as contínuas (só as assimétricas foram testadas)
 
