@@ -1,6 +1,6 @@
 ---
 # Título que aparece no relatório.
-title: "Creatinina sérica e fração de ejeção chegam? Comparação de modelos de previsão de morte na insuficiência cardíaca"
+title: "Predição da morte na insuficiência cardíaca sistólica: modelo de duas variáveis contra modelo completo, com validação interna"
 # Subtítulo com a identificação do trabalho.
 subtitle: "MAIS 2026/27 | Trabalho de grupo"
 # Autores; substituir pelos nomes do grupo ou pelo teu nome.
@@ -27,6 +27,12 @@ format:
     code-summary: "Mostrar o código"
     # Incluir imagens e dependências no HTML, para entregar um ficheiro único.
     embed-resources: true
+    # Justificar os parágrafos do texto.
+    include-in-header:
+      text: |
+        <style>
+        section p { text-align: justify; }
+        </style>
     # Largura dos gráficos em polegadas.
     fig-width: 7
     # Altura dos gráficos em polegadas.
@@ -182,6 +188,24 @@ legenda_auc <- function(nome, roc_obj) {
 }
 ```
 
+```{r}
+#| label: formulas
+#| include: false
+# Definido aqui porque os Métodos já usam estes valores no texto.
+# A creatinina entra em log (decisão do teste da forma, nos Resultados). Tudo o
+# resto entra como está. O time nunca entra: só se conhece depois do desfecho
+# (data leakage).
+f1 <- y ~ log(serum_creatinine) + ejection_fraction
+f4 <- y ~ log(serum_creatinine) + ejection_fraction + age + serum_sodium +
+          anaemia + high_blood_pressure + diabetes + sex + smoking +
+          creatinine_phosphokinase + platelets
+
+# Mortes por parâmetro (regra de 10): para usar inline no texto.
+n_mortes <- sum(dataset$y)
+epp_1 <- n_mortes / length(coef(glm(f1, family = binomial, data = dataset)))
+epp_4 <- n_mortes / length(coef(glm(f4, family = binomial, data = dataset)))
+```
+
 ## Resumo (abstract)
 
 Entre 250 e 350 palavras, sem referências, sem tabelas. Seis movimentos; cada um responde a uma pergunta.
@@ -200,26 +224,50 @@ Entre 250 e 350 palavras, sem referências, sem tabelas. Seis movimentos; cada u
 
 ## Introdução
 
-O problema, o que se sabe, a lacuna e o objetivo. Termina com a questão de avaliação em formato PICO: população, intervenção ou exposição, comparador, desfecho.
+A insuficiência cardíaca afeta mais de 64 milhões de pessoas no mundo inteiro (1), apresentando uma prevalência de 16,5 % nos adultos com 50 ou mais anos em Portugal (2). Devido ao envelhecimento da população e à maior esperança de vida proporcionada pelos tratamentos eficazes, o número de pessoas afetadas pela doença tem vindo a aumentar. Assim, estimar o risco de morte na admissão é importante, pela elevada mortalidade imediata e a curto prazo, para identificar fatores precipitantes e comorbilidades críticas e para prevenir os reinternamentos (1).
+
+Na base *Heart Failure Clinical Records* (3), Chicco e Jurman (4) concluíram, através de algoritmos de *machine learning*, que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência. Porém, esta conclusão resultou de uma seleção de variáveis nos mesmos dados e assenta em métricas de classificação. Não se sabe se se mantém com o otimismo corrigido por validação interna e com a calibração avaliada, como recomenda a TRIPOD+AI (5).
+
+O objetivo deste trabalho foi comparar, após validação interna, a discriminação e a calibração de um modelo de regressão logística apenas com creatinina sérica e fração de ejeção com as de um modelo com todas as variáveis clínicas, na previsão da morte durante o seguimento.
+
+A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (P), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (I) tem discriminação e calibração semelhantes às de um modelo com todas as variáveis clínicas (C) na previsão da morte durante o seguimento, após validação interna (O)?
 
 ## Métodos
 
 ### Dados
 
-<!-- VERIFICAR REFERÊNCIA: "(1)" nesta secção deve ser a fonte dos dados (Ahmad et al. 2017), mas a ref. 1 da lista é Friedman et al. Acrescentar e renumerar. -->
-Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a Heart Failure Clinical Records, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, em 2015 (1). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas.
+Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a *Heart Failure Clinical Records*, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).
 
-Segundo a fonte, foram incluídos doentes internados com insuficiência cardíaca com disfunção do ventrículo esquerdo e classe III ou IV da NYHA (1). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
+Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (3). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
 
 O tempo de seguimento (`time`) foi excluído dos modelos, porque só se conhece no fim do seguimento e depende do próprio desfecho: quem morre tem um seguimento mais curto. Usá-lo como preditor seria *data leakage*.
 
 ### Variáveis
 
-O desfecho principal e como foi definido. As variáveis de exposição e de ajuste, com as unidades e as categorias.
+A base de dados apresenta no total 13 variáveis: 11 características clínicas, o tempo de seguimento e o desfecho. Assim, os preditores foram:
+
+- 6 variáveis numéricas contínuas: “Idade, anos”, "Creatina fosfoquinase (CPK), mcg/L", "Fração de ejeção, %", "Plaquetas, kiloplaquetas/mL", "Creatinina sérica, mg/dL" e "Sódio sérico, mEq/L"
+- 5 variáveis categóricas binárias: "Anemia", "Diabetes", "Hipertensão arterial", "Sexo masculino", "Fumador"
+
+As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino.
+
+Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline natural de 3 graus de liberdade pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
+
+Definimos, então, dois modelos: o modelo 1, com a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis propostas por Chicco e Jurman (4), e o modelo 4, que inclui as 11 variáveis clínicas. Com `r n_mortes` mortes, o número de mortes por parâmetro, contando a ordenada na origem, foi `r num(epp_1, 1)` no modelo 1 e `r num(epp_4, 1)` no modelo 4. Este último fica abaixo da regra prática de 10, o que faz esperar sobreajustamento.
 
 ### Análise estatística
 
-Que estatísticas descritivas, que testes ou modelos, com que pressupostos verificados, com que nível de confiança. Como foram tratados os valores em falta. O software: R `r paste(R.version$major, R.version$minor, sep = ".")` e os pacotes principais.
+As variáveis contínuas foram descritas por mediana e intervalo interquartil e as binárias por frequências absolutas e relativas, por desfecho. Os modelos foram ajustados por regressão logística e produzem probabilidades de morte, sem limiar de decisão. Como `r num(100 * mean(dataset$y), 1)` % dos doentes morreram, não foram usados métodos para classes desequilibradas. A análise principal foi a comparação da AUC validada entre os dois modelos; a AUC aparente, o otimismo e a calibração foram análises secundárias.
+
+A discriminação foi medida pela AUC, com IC de 95 % pelo método de DeLong. Calculámos primeiro a AUC aparente, nos mesmos dados do ajuste. Para corrigir o otimismo, usámos validação cruzada em 10 partes: cada doente foi previsto por um modelo ajustado sem ele, com as mesmas partes para os dois modelos e a semente 2026. O otimismo é a diferença entre a AUC aparente e a validada.
+
+A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), com IC 95 % e teste de DeLong emparelhado, sem declarar equivalência.
+
+A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a *calibration-in-the-large* (ideal 0) e o declive (ideal 1), com IC 95 %.
+
+<!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
+
+A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. O reporte segue a TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
 ## Resultados
 
@@ -356,21 +404,6 @@ forma |>
 ```
 
 Na creatinina, a relação linear com o logit do risco foi rejeitada (p = `r num_p(forma$p_lrt[1])`) e o logaritmo teve AIC menor do que a spline (`r num(forma$aic_log[1], 1)` contra `r num(forma$aic_spline[1], 1)`); a creatinina entrou nos modelos em logaritmo. Na CPK, a relação linear não foi rejeitada (p = `r num_p(forma$p_lrt[2])`) e a variável entrou como está.
-
-```{r}
-#| label: formulas
-# A creatinina entra em log (decisão da @tbl-forma). Tudo o resto entra como
-# está. O time nunca entra: só se conhece depois do desfecho (data leakage).
-f1 <- y ~ log(serum_creatinine) + ejection_fraction
-f4 <- y ~ log(serum_creatinine) + ejection_fraction + age + serum_sodium +
-          anaemia + high_blood_pressure + diabetes + sex + smoking +
-          creatinine_phosphokinase + platelets
-
-# Mortes por parâmetro (regra de 10): para usar inline no texto.
-n_mortes <- sum(dataset$y)
-epp_1 <- n_mortes / length(coef(glm(f1, family = binomial, data = dataset)))
-epp_4 <- n_mortes / length(coef(glm(f4, family = binomial, data = dataset)))
-```
 
 Com `r n_mortes` mortes, o modelo 1 tem `r num(epp_1, 1)` mortes por parâmetro e o modelo 4 tem `r num(epp_4, 1)`, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.
 
@@ -546,6 +579,14 @@ grafico_calibracao(cal4)
 
 O resultado principal numa frase. Como se compara com o que se sabia. As limitações do desenho e dos dados, com o efeito provável de cada uma sobre o resultado. O que se faria a seguir.
 
+### Limitações
+
+A base de dados não inclui os tratamentos recebidos, pelo que estes não foram considerados nos modelos. Também não identifica o hospital de cada doente, o que impediu avaliar a heterogeneidade entre centros. A equidade dos modelos não foi avaliada: `r num(100 * mean(dataset$sex), 1)` % dos doentes são homens e todos provêm de uma só população.
+
+### Transportabilidade
+
+Na prática, o modelo 1 usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.
+
 ## Declaração de uso de inteligência artificial
 
 Declaramos que na elaboração deste trabalho foi utilizada a seguinte ferramenta de inteligência artificial generativa:
@@ -566,11 +607,125 @@ Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0); a declaração pode
 
 ## Referências
 
-Estilo Vancouver, numeradas pela ordem de citação. Todas verificadas na fonte.
+1. Savarese G, Becher PM, Lund LH, Seferovic P, Rosano GMC, Coats AJS. Global burden of heart failure: a comprehensive and updated review of epidemiology. Cardiovasc Res. 2023;118(17):3272–87. doi:10.1093/cvr/cvac013
 
-1. Friedman CP, Wyatt JC, Ash JS. Evaluation Methods in Biomedical and Health Informatics. 3.ª ed. Cham: Springer; 2022.
+2. Baptista R, Rodrigues AM, Bernardo F, Mendes LL, Franco F, Pimenta J, et al. Heart failure in the Portuguese population aged ≥50 years: prevalence and phenotypes in the PORTHOS study. Eur Heart J. 2026;47(34):4806–22. doi:10.1093/eurheartj/ehag030
 
-## Anexo: ambiente de execução
+3. Ahmad T, Munir A, Bhatti SH, Aftab M, Raza MA. Survival analysis of heart failure patients: a case study. PLoS One. 2017;12(7):e0181001. doi:10.1371/journal.pone.0181001
+
+4. Chicco D, Jurman G. Machine learning can predict survival of patients with heart failure from serum creatinine and ejection fraction alone. BMC Med Inform Decis Mak. 2020;20(1):16. doi:10.1186/s12911-020-1023-5
+
+5. Collins GS, Moons KGM, Dhiman P, Riley RD, Beam AL, Van Calster B, et al. TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods. BMJ. 2024;385:e078378. doi:10.1136/bmj-2023-078378
+
+## Anexo A: coeficientes dos modelos
+
+A @tbl-coeficientes apresenta os coeficientes (β) dos dois modelos, ajustados a todos os doentes. Para aplicar a equação, soma-se a ordenada na origem ao produto de cada β pelo valor da variável, obtendo-se o preditor linear (PL); a probabilidade prevista de morte é $p = e^{PL} / (1 + e^{PL})$.
+
+```{r}
+#| label: tbl-coeficientes
+#| tbl-cap: "Coeficientes (β) dos modelos de regressão logística, na escala do logit."
+# num_beta(): 4 algarismos significativos, porque alguns β são muito pequenos.
+num_beta <- function(x) {
+  gsub("-", "−", formatC(x, format = "g", digits = 4, decimal.mark = ","))
+}
+
+rotulos <- c(
+  "(Intercept)"              = "Ordenada na origem",
+  "log(serum_creatinine)"    = "Logaritmo natural da creatinina sérica (mg/dL)",
+  "ejection_fraction"        = "Fração de ejeção (%)",
+  "age"                      = "Idade (anos)",
+  "serum_sodium"             = "Sódio sérico (mEq/L)",
+  "anaemia"                  = "Anemia (1 = sim)",
+  "high_blood_pressure"      = "Hipertensão arterial (1 = sim)",
+  "diabetes"                 = "Diabetes (1 = sim)",
+  "sex"                      = "Sexo (1 = masculino)",
+  "smoking"                  = "Fumador (1 = sim)",
+  "creatinine_phosphokinase" = "CPK (mcg/L)",
+  "platelets"                = "Plaquetas (kiloplaquetas/mL)"
+)
+
+tidy(glm(f4, family = binomial, data = dataset)) |>
+  select(term, beta4 = estimate) |>
+  left_join(
+    tidy(glm(f1, family = binomial, data = dataset)) |>
+      select(term, beta1 = estimate),
+    by = "term"
+  ) |>
+  transmute(
+    Variável     = unname(rotulos[term]),
+    `β modelo 1` = if_else(is.na(beta1), "—", num_beta(beta1)),
+    `β modelo 4` = num_beta(beta4)
+  ) |>
+  knitr::kable()
+```
+
+## Anexo B: lista de verificação TRIPOD+AI {#anexo-tripod}
+
+Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D = desenvolvimento; E = avaliação.
+
+| Item | Tipo | Recomendação (resumida) | Onde está no relatório |
+|--|--|------------|----------|
+| **Título e resumo** | | | |
+| 1 | D;E | Identificar o estudo como desenvolvimento ou avaliação de um modelo de predição, com a população e o desfecho | Título |
+| 2 | D;E | Resumo segundo a TRIPOD+AI para resumos | Resumo |
+| **Introdução** | | | |
+| 3a | D;E | Contexto clínico e racional, com referência a modelos existentes | Introdução (§1–2) |
+| 3b | D;E | População-alvo, finalidade no percurso de cuidados e utilizadores previstos | Introdução (§1) |
+| 3c | D;E | Desigualdades de saúde conhecidas entre grupos sociodemográficos | Discussão – Limitações |
+| 4 | D;E | Objetivos, incluindo se o estudo desenvolve, avalia ou ambos | Introdução (§3–4, objetivo e PICO) |
+| **Métodos** | | | |
+| 5a | D;E | Fontes de dados e sua representatividade | Métodos – Dados |
+| 5b | D;E | Datas de recolha e de fim do seguimento | Métodos – Dados (abr.–dez. 2015; seguimento 4–285 dias) |
+| 6a | D;E | Contexto do estudo, número e localização dos centros | Métodos – Dados (2 hospitais, Faisalabad) |
+| 6b | D;E | Critérios de elegibilidade | Métodos – Dados |
+| 6c | D;E | Tratamentos recebidos e como foram considerados | Não disponível na base; Discussão – Limitações |
+| 7 | D;E | Pré-processamento e controlo de qualidade dos dados | Métodos – Dados |
+| 8a | D;E | Definição do desfecho, horizonte temporal e momento de avaliação | Métodos – Dados |
+| 8b | D;E | Qualificações de quem avalia o desfecho, se subjetivo | Não aplicável (morte é objetiva) |
+| 8c | D;E | Ocultação na avaliação do desfecho | Não aplicável (dados retrospetivos públicos) |
+| 9a | D | Escolha inicial dos preditores e pré-seleção | Métodos – Variáveis (modelo 1 de Chicco e Jurman; modelo 4 com todas) |
+| 9b | D;E | Definição, momento e forma de medição dos preditores | Métodos – Variáveis; Dados (`time` excluído) |
+| 9c | D;E | Qualificações de quem avalia os preditores, se subjetivos | Não aplicável (medições objetivas) |
+| 10 | D;E | Como foi definido o tamanho amostral e porque é suficiente | Métodos – Variáveis (mortes por parâmetro) |
+| 11 | D;E | Tratamento dos dados em falta | Métodos – Dados (sem valores em falta) |
+| 12a | D | Uso e partição dos dados | Métodos – Análise estatística (validação cruzada em 10 partes) |
+| 12b | D | Forma funcional e transformações dos preditores | Métodos – Variáveis (creatinina em log) |
+| 12c | D | Tipo de modelo, construção e validação interna | Métodos – Variáveis; Análise estatística |
+| 12d | D;E | Heterogeneidade entre centros | Não aplicável (a base não identifica o hospital); Limitações |
+| 12e | D;E | Medidas de desempenho e comparação entre modelos | Métodos – Análise estatística |
+| 12f | E | Atualização do modelo (ex.: recalibração) | Não aplicável |
+| 12g | E | Como foram calculadas as predições | Não aplicável (avaliação interna); equação no Anexo A |
+| 13 | D;E | Métodos para classes desequilibradas | Não usados (32 % de mortes); Métodos |
+| 14 | D;E | Abordagens à equidade do modelo | Não avaliada; Discussão – Limitações |
+| 15 | D | Tipo de saída do modelo e limiares | Métodos (probabilidades, sem limiar) |
+| 16 | D;E | Diferenças entre dados de desenvolvimento e de avaliação | Não aplicável (mesma base) |
+| 17 | D;E | Aprovação ética e consentimento | Métodos – Dados (base pública anonimizada; aprovação no estudo original) |
+| **Ciência aberta** | | | |
+| 18a | D;E | Financiamento | Sem financiamento (trabalho académico) |
+| 18b | D;E | Conflitos de interesse | Sem conflitos de interesse |
+| 18c | D;E | Protocolo | Sem protocolo publicado |
+| 18d | D;E | Registo | Não registado |
+| 18e | D;E | Disponibilidade dos dados | Base pública (UCI), incluída no `.zip` |
+| 18f | D;E | Disponibilidade do código | `relatorio.qmd` e `analise.R`, no `.zip` |
+| **Envolvimento de doentes** | | | |
+| 19 | D;E | Envolvimento de doentes e público | Sem envolvimento |
+| **Resultados** | | | |
+| 20a | D;E | Fluxo de participantes, n com e sem desfecho, seguimento | Resultados – Caracterização da amostra |
+| 20b | D;E | Características dos participantes | Resultados – Tabela 1 |
+| 20c | E | Comparação com os dados de desenvolvimento | Não aplicável |
+| 21 | D;E | N de participantes e eventos em cada análise | Resultados; Análise de sensibilidade [A PREENCHER] |
+| 22 | D | Modelo completo, para outros o poderem aplicar | Anexo A – Coeficientes |
+| 23a | D;E | Desempenho com IC, incluindo subgrupos | Resultados – Discriminação, Comparação principal, Calibração |
+| 23b | D;E | Heterogeneidade do desempenho entre centros | Não aplicável |
+| 24 | E | Resultados de atualização do modelo | Não aplicável |
+| **Discussão** | | | |
+| 25 | D;E | Interpretação geral, incluindo equidade e estudos anteriores | Discussão (§1–3) |
+| 26 | D;E | Limitações e efeito sobre viés, incerteza e generalização | Discussão – Limitações |
+| 27a | D | Como lidar com dados em falta ou de má qualidade na prática | Discussão – Transportabilidade |
+| 27b | D | Interação dos utilizadores com o modelo e competências exigidas | Discussão – Transportabilidade |
+| 27c | D;E | Próximos passos de investigação | Discussão – Próximos passos |
+
+## Anexo C: ambiente de execução
 
 ```{r}
 #| label: sessao
