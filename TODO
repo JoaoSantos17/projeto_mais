@@ -45,7 +45,7 @@ A.3 Secção 5 — validação cruzada (✔ feita):
   ✔ Gráfico ROC validado @done(26-11-17)
 
 A.4 Secção 6 — comparação principal (✔ feita):
-  ✔ Diferença AUC = 0,021; IC 95 % −0,061 a 0,019; p = 0,31 @done(26-11-17)
+  ✔ Diferença AUC (mod 4 − mod 1) = 0,021; IC 95 % −0,019 a 0,061; p = 0,31 @done(26-11-17)
 
 A.5 Secção 7 — calibração (✔ feita):
   ✔ Funções calibracao() e resumo_calibracao() com IC @done(26-11-17)
@@ -65,21 +65,22 @@ A.7 Secção 9 — figuras finais:
 ═══════════════════════════════════════════════════════════════════════════
 
 B.1 Setup do .qmd:
-  ☐ Descarregar modelo: https://tiagojacinto.eu/mais-2627/modelos/relatorio-trabalho.qmd @critical
-  ☐ Adaptar: título, autores, ficheiro de dados; apagar exemplos do professor
-  ☐ Passar código do analise.R para blocos do .qmd
-  ☐ Números inline com vírgula decimal, nunca escritos à mão
+  ✔ Descarregar modelo: https://tiagojacinto.eu/mais-2627/modelos/relatorio-trabalho.qmd @critical @done(26-11-17 23:17)
+  ✔ Adaptar: título, autores, ficheiro de dados; apagar exemplos do professor @done(26-11-17)
+  ✔ Passar código do analise.R para blocos do .qmd @done(26-11-17)
+  ✔ Números inline com vírgula decimal, nunca escritos à mão @done(26-11-17)
 
 B.2 Introdução:
-  ☐ Problema, literatura (com referências), lacuna, objetivo, PICO
+  ✔ Problema, literatura (com referências), lacuna, objetivo, PICO @done(26-11-18)
 
 B.3 Métodos:
-  ☐ Dados: Ahmad et al. 2017; UCI, CC BY 4.0; 2 hospitais Faisalabad; n = 299; sem valores em falta
-  ☐ Desfecho: morte durante seguimento (4–285 dias); time fora dos modelos e porquê
-  ☐ Variáveis de cada modelo, unidades, codificação do sexo
+  ✔ Dados: Ahmad et al. 2017; UCI, CC BY 4.0; 2 hospitais Faisalabad; n = 299; sem valores em falta @done(26-11-17)
+  ✔ Desfecho: morte durante seguimento (4–285 dias); time fora dos modelos e porquê @done(26-11-17)
+  ✔ Variáveis de cada modelo, unidades, codificação do sexo @done(26-11-18)
   ☐ Análise: principal (1 vs 4) e secundárias; pressupostos; mortes por parâmetro; CV; calibração; sensibilidade
-  ☐ Software com versões de R e pacotes
+  ✔ Software com versões de R e pacotes @done(26-11-18)
   ☐ Seguir TRIPOD+AI
+  ✔ Rever "registadas na admissão" (Métodos → Variáveis e item 9b do Anexo B): Ahmad et al. (2017) não indica o momento da medição das variáveis @critical @done(26-11-18)
 
 B.4 Resultados:
   ☐ Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figuras
@@ -91,12 +92,17 @@ B.5 Discussão:
   ☐ Comparação com Chicco e Jurman (2020) e Ahmad et al. (2017)
   ☐ Limitações: seguimento desigual; 2 hospitais; sem validação externa; variáveis em falta; 96 mortes
   ☐ O que seria preciso para usar o modelo noutro hospital
+  ☐ Item 27b da TRIPOD+AI: decidir quem usaria o modelo e que competências exige, e acrescentar à subsecção Transportabilidade
 
 B.6 Resumo (abstract):
   ☐ 250–350 palavras, 6 movimentos, resultados com números, sem referências
 
 B.7 Referências:
   ☐ Vancouver, numeradas pela ordem de citação, todas verificadas na fonte
+  ☐ Métodos → Dados cita "(1)" como fonte dos dados, mas a ref. 1 da lista é Friedman et al.: acrescentar Ahmad et al. 2017 e renumerar @critical
+     Ahmad T, Munir A, Bhatti SH, Aftab M, Raza MA. Survival analysis of heart failure patients: a case study. PLoS One. 2017;12(7):e0181001. doi:10.1371/journal.pone.0181001
+     (verificada na fonte: página do artigo na PLoS One)
+  ☐ Introdução: trocar os marcadores "(ref ...)" por números e acrescentar à lista Savarese, Ahmad, Chicco e Jurman, Collins (Baptista et al. 2026 já está na lista, falta renumerar) @critical
 
 B.8 Formatação:
   ☐ 2000–3500 palavras (sem código, anexos e referências)

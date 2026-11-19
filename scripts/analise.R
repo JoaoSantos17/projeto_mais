@@ -357,7 +357,9 @@ comp <- roc.test(roc_cv1, roc_cv4, paired = TRUE, method = "delong")
 
 cat("Diferença de AUC (modelo 4 − modelo 1):",
     round(auc(roc_cv4) - auc(roc_cv1), 3), "\n")
-cat("IC 95%:", round(comp$conf.int[1], 3), "a", round(comp$conf.int[2], 3), "\n")
+# O IC do roc.test() é de (modelo 1 − modelo 4); trocam-se os limites e o
+# sinal para ficar na mesma direção da diferença acima (modelo 4 − modelo 1).
+cat("IC 95%:", round(-comp$conf.int[2], 3), "a", round(-comp$conf.int[1], 3), "\n")
 cat("p =", signif(comp$p.value, 3), "\n")
 
 # 7. Calibração ---------------------------------------------------------------

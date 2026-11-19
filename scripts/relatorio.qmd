@@ -1,0 +1,736 @@
+---
+# Título que aparece no relatório.
+title: "Predição da morte na insuficiência cardíaca sistólica: modelo de duas variáveis contra modelo completo, com validação interna"
+# Subtítulo com a identificação do trabalho.
+subtitle: "MAIS 2026/27 | Trabalho de grupo"
+# Autores; substituir pelos nomes do grupo ou pelo teu nome.
+author:
+  - "Isabelle Araújo"
+  - "Joao Santos"
+  - "Joaquim Santos"
+  - "Raquel Bragança"
+# today usa a data em que o documento é renderizado.
+date: today
+# Define a língua de datas e rótulos do documento.
+lang: pt-PT
+# Formato de saída e respetivas opções.
+format:
+  # Produzir um documento HTML para abrir no navegador.
+  html:
+    # Mostrar (true) ou ocultar (false) o índice de secções.
+    toc: true
+    # Profundidade de títulos que entram no índice.
+    toc-depth: 2
+    # Recolher o código em painéis que o leitor pode abrir.
+    code-fold: true
+    # Texto do botão que abre o código recolhido.
+    code-summary: "Mostrar o código"
+    # Incluir imagens e dependências no HTML, para entregar um ficheiro único.
+    embed-resources: true
+    # Justificar os parágrafos do texto.
+    include-in-header:
+      text: |
+        <style>
+        section p { text-align: justify; }
+        </style>
+    # Largura dos gráficos em polegadas.
+    fig-width: 7
+    # Altura dos gráficos em polegadas.
+    fig-height: 4
+# Opções comuns a todos os blocos de código executáveis.
+execute:
+  # Mostrar (true) ou ocultar (false) o código; os resultados continuam
+  # visíveis.
+  echo: true
+  # Mostrar ou ocultar avisos no relatório; confere-os ao testar o código.
+  warning: false
+  # Mostrar ou ocultar mensagens, como as de arranque dos pacotes.
+  message: false
+---
+
+```{r}
+#| label: pacotes
+#| include: false
+# library(): carrega um pacote e disponibiliza as suas funções nesta sessão de
+# R.
+library(tidyverse)
+library(gtsummary)
+library(broom)
+library(here)
+library(pROC)
+# theme_gtsummary_language(): define a língua e os separadores numéricos das
+# tabelas gtsummary.
+theme_gtsummary_language("pt", decimal.mark = ",", big.mark = " ")
+```
+
+```{r}
+#| label: importar
+#| include: false
+# Heart failure clinical records (Ahmad et al. 2017; UCI, CC BY 4.0).
+# read_csv(): lê um CSV separado por vírgulas e devolve uma tabela; confere os
+# tipos importados.
+# here(): constrói um caminho a partir da raiz do projeto, evitando caminhos
+# do computador.
+dataset <- read_csv(here("data", "raw", "heart_failure_clinical_records_dataset.csv"))
+
+# Desfecho como coluna y DENTRO dos dados, em 0/1 numérico:
+# as funções das análises usam dados$y e a calibração faz contas com ele.
+dataset <- dataset |>
+  mutate(y = DEATH_EVENT)
+
+# Os Métodos afirmam que não há valores em falta nem linhas duplicadas:
+# se os dados mudarem e isso deixar de ser verdade, o render para aqui.
+stopifnot(sum(is.na(dataset)) == 0, !any(duplicated(dataset)))
+```
+
+```{r}
+#| label: funcoes
+#| include: false
+# num(): formata números com vírgula decimal, para tabelas, legendas e texto.
+# O sinal menos tipográfico (−) substitui o hífen nos números negativos.
+num <- function(x, digitos = 3) {
+  sub("-", "−", formatC(x, format = "f", digits = digitos, decimal.mark = ","))
+}
+
+# num_p(): valor de p com vírgula decimal; abaixo de 0,001 escreve "< 0,001".
+num_p <- function(p) {
+  ifelse(p < 0.001, "< 0,001", num(p, 3))
+}
+
+# num_ic(): estimativa com IC 95 % entre parênteses, pronta para o texto.
+num_ic <- function(est, inf, sup, digitos = 3) {
+  paste0(num(est, digitos), " (IC 95 % ", num(inf, digitos), " a ", num(sup, digitos), ")")
+}
+
+# logit_por_decil(): divide os doentes em 10 grupos (decis) pela variável,
+# calcula a proporção de mortes em cada grupo e passa-a para a escala logit
+# (a escala em que a regressão logística traça uma reta).
+logit_por_decil <- function(dados, variavel) {
+  dados |>
+    mutate(decil = ntile({{ variavel }}, 10)) |>
+    group_by(decil) |>
+    summarise(mediana = median({{ variavel }}), prop_mortes = mean(y)) |>
+    mutate(logit = qlogis(prop_mortes))
+}
+
+# teste_forma(): aplica a árvore de decisão a uma variável contínua.
+#   A reta falha? (LRT: linear vs. spline)
+#   ├── Não (p >= 0,05) → linear
+#   └── Sim (p < 0,05) → AIC do log ≤ AIC da spline → log; senão → spline
+# Devolve uma linha de tabela com p_lrt, aic_log, aic_spline e a decisão.
+teste_forma <- function(dados, formula_base, variavel) {
+  formula_log <- update(formula_base,
+    paste(". ~ . -", variavel, "+ log(", variavel, ")"))
+  formula_spline <- update(formula_base,
+    paste(". ~ . -", variavel, "+ splines::ns(", variavel, ", df = 3)"))
+
+  mod_linear <- glm(formula_base,   family = binomial, data = dados)
+  mod_log    <- glm(formula_log,    family = binomial, data = dados)
+  mod_spline <- glm(formula_spline, family = binomial, data = dados)
+
+  p_lrt      <- anova(mod_linear, mod_spline, test = "LRT")$`Pr(>Chi)`[2]
+  aic_log    <- AIC(mod_log)
+  aic_spline <- AIC(mod_spline)
+
+  decisao <- if (p_lrt >= 0.05) {
+    "Linear"
+  } else if (aic_log <= aic_spline) {
+    "Logaritmo"
+  } else {
+    "Spline"
+  }
+
+  tibble(variavel = variavel, p_lrt = p_lrt, aic_log = aic_log,
+         aic_spline = aic_spline, decisao = decisao)
+}
+
+# ajustar(): ajusta um glm e devolve probabilidades previstas.
+# Com teste = treino → previsões aparentes; com teste ≠ treino → validação.
+ajustar <- function(formula, treino, teste = treino) {
+  modelo <- glm(formula, data = treino, family = binomial)
+  predict(modelo, newdata = teste, type = "response")
+}
+
+# calibracao(): agrupa os doentes em decis pela probabilidade prevista
+# e compara a média prevista com a proporção observada em cada grupo.
+calibracao <- function(dados, grupos = 10) {
+  dados |>
+    mutate(decil = ntile(p, grupos)) |>
+    group_by(decil) |>
+    summarise(prevista = mean(p), observada = mean(y), n = n(), .groups = "drop")
+}
+
+# resumo_calibracao(): calibração global (CITL, ideal = 0) e declive de
+# calibração (ideal = 1), com IC 95 % por confint.default().
+resumo_calibracao <- function(dados) {
+  citl <- glm(y ~ offset(qlogis(p)), data = dados, family = binomial)
+  cal  <- glm(y ~ qlogis(p), data = dados, family = binomial)
+  ic_citl  <- confint.default(citl)[1, ]
+  ic_slope <- confint.default(cal)[2, ]
+
+  tibble(
+    media_prevista  = mean(dados$p),
+    media_observada = mean(dados$y),
+    citl            = unname(coef(citl)[1]),
+    citl_inf        = ic_citl[1],
+    citl_sup        = ic_citl[2],
+    declive         = unname(coef(cal)[2]),
+    declive_inf     = ic_slope[1],
+    declive_sup     = ic_slope[2]
+  )
+}
+
+# legenda_auc(): texto da legenda das curvas ROC, com AUC e IC 95 %.
+legenda_auc <- function(nome, roc_obj) {
+  ic <- ci.auc(roc_obj)
+  paste0(nome, " (AUC = ", num(auc(roc_obj)),
+         "; IC 95 % ", num(ic[1]), "–", num(ic[3]), ")")
+}
+```
+
+```{r}
+#| label: formulas
+#| include: false
+# Definido aqui porque os Métodos já usam estes valores no texto.
+# A creatinina entra em log (decisão do teste da forma, nos Resultados). Tudo o
+# resto entra como está. O time nunca entra: só se conhece depois do desfecho
+# (data leakage).
+f1 <- y ~ log(serum_creatinine) + ejection_fraction
+f4 <- y ~ log(serum_creatinine) + ejection_fraction + age + serum_sodium +
+          anaemia + high_blood_pressure + diabetes + sex + smoking +
+          creatinine_phosphokinase + platelets
+
+# Mortes por parâmetro (regra de 10): para usar inline no texto.
+n_mortes <- sum(dataset$y)
+epp_1 <- n_mortes / length(coef(glm(f1, family = binomial, data = dataset)))
+epp_4 <- n_mortes / length(coef(glm(f4, family = binomial, data = dataset)))
+```
+
+## Resumo (abstract)
+
+Entre 250 e 350 palavras, sem referências, sem tabelas. Seis movimentos; cada um responde a uma pergunta.
+
+**Contexto.** Qual é o problema e o que já se sabe? Uma ou duas frases.
+
+**Lacuna.** O que ainda não se sabe, e que este trabalho responde? Uma frase.
+
+**Objetivo.** O que este trabalho faz? Uma frase, com a questão de avaliação implícita.
+
+**Métodos.** Que dados, que desenho, que variáveis, que análise. Duas ou três frases.
+
+**Resultados.** Os achados principais, com números: estimativas e intervalos de confiança, não só valores de p. Duas ou três frases.
+
+**Conclusões.** O que os resultados significam e para quem. Uma ou duas frases, sem ir além do que os dados mostram.
+
+## Introdução
+
+A insuficiência cardíaca afeta mais de 64 milhões de pessoas no mundo inteiro (1), apresentando uma prevalência de 16,5 % nos adultos com 50 ou mais anos em Portugal (2). Devido ao envelhecimento da população e à maior esperança de vida proporcionada pelos tratamentos eficazes, o número de pessoas afetadas pela doença tem vindo a aumentar. Assim, estimar o risco de morte na admissão é importante, pela elevada mortalidade imediata e a curto prazo, para identificar fatores precipitantes e comorbilidades críticas e para prevenir os reinternamentos (1).
+
+Na base *Heart Failure Clinical Records* (3), Chicco e Jurman (4) concluíram, através de algoritmos de *machine learning*, que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência. Porém, esta conclusão resultou de uma seleção de variáveis nos mesmos dados e assenta em métricas de classificação. Não se sabe se se mantém com o otimismo corrigido por validação interna e com a calibração avaliada, como recomenda a TRIPOD+AI (5).
+
+O objetivo deste trabalho foi comparar, após validação interna, a discriminação e a calibração de um modelo de regressão logística apenas com creatinina sérica e fração de ejeção com as de um modelo com todas as variáveis clínicas, na previsão da morte durante o seguimento.
+
+A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (P), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (I) tem discriminação e calibração semelhantes às de um modelo com todas as variáveis clínicas (C) na previsão da morte durante o seguimento, após validação interna (O)?
+
+## Métodos
+
+### Dados
+
+Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a *Heart Failure Clinical Records*, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).
+
+Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (3). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
+
+O tempo de seguimento (`time`) foi excluído dos modelos, porque só se conhece no fim do seguimento e depende do próprio desfecho: quem morre tem um seguimento mais curto. Usá-lo como preditor seria *data leakage*.
+
+### Variáveis
+
+A base de dados apresenta no total 13 variáveis: 11 características clínicas, o tempo de seguimento e o desfecho. Assim, os preditores foram:
+
+- 6 variáveis numéricas contínuas: “Idade, anos”, "Creatina fosfoquinase (CPK), mcg/L", "Fração de ejeção, %", "Plaquetas, kiloplaquetas/mL", "Creatinina sérica, mg/dL" e "Sódio sérico, mEq/L"
+- 5 variáveis categóricas binárias: "Anemia", "Diabetes", "Hipertensão arterial", "Sexo masculino", "Fumador"
+
+As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino.
+
+Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline natural de 3 graus de liberdade pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
+
+Definimos, então, dois modelos: o modelo 1, com a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis propostas por Chicco e Jurman (4), e o modelo 4, que inclui as 11 variáveis clínicas. Com `r n_mortes` mortes, o número de mortes por parâmetro, contando a ordenada na origem, foi `r num(epp_1, 1)` no modelo 1 e `r num(epp_4, 1)` no modelo 4. Este último fica abaixo da regra prática de 10, o que faz esperar sobreajustamento.
+
+### Análise estatística
+
+As variáveis contínuas foram descritas por mediana e intervalo interquartil e as binárias por frequências absolutas e relativas, por desfecho. Os modelos foram ajustados por regressão logística e produzem probabilidades de morte, sem limiar de decisão. Como `r num(100 * mean(dataset$y), 1)` % dos doentes morreram, não foram usados métodos para classes desequilibradas. A análise principal foi a comparação da AUC validada entre os dois modelos; a AUC aparente, o otimismo e a calibração foram análises secundárias.
+
+A discriminação foi medida pela AUC, com IC de 95 % pelo método de DeLong. Calculámos primeiro a AUC aparente, nos mesmos dados do ajuste. Para corrigir o otimismo, usámos validação cruzada em 10 partes: cada doente foi previsto por um modelo ajustado sem ele, com as mesmas partes para os dois modelos e a semente 2026. O otimismo é a diferença entre a AUC aparente e a validada.
+
+A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), com IC 95 % e teste de DeLong emparelhado, sem declarar equivalência.
+
+A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a *calibration-in-the-large* (ideal 0) e o declive (ideal 1), com IC 95 %.
+
+<!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
+
+A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. O reporte segue a TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
+
+## Resultados
+
+### Caracterização da amostra
+
+Os dados incluem `r nrow(dataset)` doentes, dos quais `r sum(dataset$y)` (`r num(100 * mean(dataset$y), 1)` %) morreram durante o seguimento. A @tbl-caracterizacao descreve a amostra por desfecho.
+
+```{r}
+#| label: tbl-caracterizacao
+#| tbl-cap: "Características dos doentes por desfecho. Contínuas em mediana [IIQ]; binárias em n (%)."
+# O fator com rótulos é criado só dentro deste pipe, para não alterar o y
+# numérico. O time fica de fora: é o tempo de seguimento, não uma
+# característica do doente.
+dataset |>
+  mutate(y = factor(y, levels = c(0, 1), labels = c("Sobreviveu", "Morreu"))) |>
+  select(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,
+         ejection_fraction, serum_creatinine, serum_sodium,
+         creatinine_phosphokinase, platelets) |>
+  tbl_summary(
+    by = y,
+    statistic = list(all_continuous() ~ "{median} [{p25}–{p75}]"),
+    digits = list(serum_sodium ~ 0),
+    label = list(
+      age                      ~ "Idade, anos",
+      sex                      ~ "Sexo masculino",
+      smoking                  ~ "Fumador",
+      anaemia                  ~ "Anemia",
+      diabetes                 ~ "Diabetes",
+      high_blood_pressure      ~ "Hipertensão arterial",
+      ejection_fraction        ~ "Fração de ejeção, %",
+      serum_creatinine         ~ "Creatinina sérica, mg/dL",
+      serum_sodium             ~ "Sódio sérico, mEq/L",
+      creatinine_phosphokinase ~ "Creatina fosfoquinase (CPK), mcg/L",
+      platelets                ~ "Plaquetas, kiloplaquetas/mL"
+    ),
+    missing_text = "Em falta"
+  ) |>
+  add_overall(col_label = "**Total**  \nN = {N}") |>
+  bold_labels()
+```
+
+### Forma das variáveis contínuas
+
+A @fig-histogramas mostra a distribuição das variáveis contínuas. A creatinina e a CPK são assimétricas à direita; as restantes são aproximadamente simétricas.
+
+```{r}
+#| label: fig-histogramas
+#| fig-cap: "Distribuição das variáveis contínuas."
+#| fig-subcap:
+#|   - "Creatinina sérica"
+#|   - "Logaritmo da creatinina sérica"
+#|   - "CPK"
+#|   - "Logaritmo da CPK"
+#|   - "Idade"
+#|   - "Fração de ejeção"
+#|   - "Sódio sérico"
+#|   - "Plaquetas"
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 3
+# histograma(): o mesmo gráfico para cada variável, para não repetir código.
+histograma <- function(x, rotulo) {
+  ggplot(dataset, aes(x = x)) +
+    geom_histogram(bins = 20, colour = "white") +
+    labs(x = rotulo, y = "Número de doentes") +
+    theme_minimal()
+}
+
+histograma(dataset$serum_creatinine, "Creatinina sérica (mg/dL)")
+histograma(log(dataset$serum_creatinine), "Logaritmo da creatinina sérica")
+histograma(dataset$creatinine_phosphokinase, "CPK (mcg/L)")
+histograma(log(dataset$creatinine_phosphokinase), "Logaritmo da CPK")
+histograma(dataset$age, "Idade (anos)")
+histograma(dataset$ejection_fraction, "Fração de ejeção (%)")
+histograma(dataset$serum_sodium, "Sódio sérico (mEq/L)")
+histograma(dataset$platelets, "Plaquetas (kiloplaquetas/mL)")
+```
+
+A @fig-logit-creatinina mostra o logit da proporção de mortes por decil da creatinina, na escala original e em logaritmo.
+
+```{r}
+#| label: fig-logit-creatinina
+#| fig-cap: "Logit da proporção de mortes por decil da creatinina sérica. Cada ponto é um decil (cerca de 30 doentes); a reta é a relação que o modelo assume."
+#| fig-subcap:
+#|   - "Escala original"
+#|   - "Escala logarítmica"
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 3
+decis_creat <- logit_por_decil(dataset, serum_creatinine)
+
+ggplot(decis_creat, aes(x = mediana, y = logit)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Creatinina sérica (mg/dL), mediana do decil",
+       y = "Logit da proporção de mortes") +
+  theme_minimal()
+
+ggplot(decis_creat, aes(x = log(mediana), y = logit)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Logaritmo da creatinina sérica, mediana do decil",
+       y = "Logit da proporção de mortes") +
+  theme_minimal()
+```
+
+A @tbl-forma mostra o teste da forma: a creatinina foi testada no modelo 1 e a CPK no modelo 4, já com a creatinina em logaritmo.
+
+```{r}
+#| label: tbl-forma
+#| tbl-cap: "Teste da forma das variáveis assimétricas. LRT: modelo linear contra spline (3 graus de liberdade); AIC: logaritmo contra spline."
+forma <- bind_rows(
+  # Creatinina no modelo 1 (2 variáveis)
+  teste_forma(dataset, y ~ ejection_fraction + serum_creatinine,
+              "serum_creatinine"),
+  # CPK no modelo 4 (11 variáveis; creatinina já em log)
+  teste_forma(dataset,
+    y ~ age + anaemia + diabetes + high_blood_pressure + sex + smoking +
+        ejection_fraction + log(serum_creatinine) + serum_sodium +
+        creatinine_phosphokinase + platelets,
+    "creatinine_phosphokinase")
+)
+
+forma |>
+  mutate(
+    variavel   = c("Creatinina sérica", "CPK"),
+    p_lrt      = num(p_lrt),
+    aic_log    = num(aic_log, 1),
+    aic_spline = num(aic_spline, 1)
+  ) |>
+  select(Variável = variavel, `p (LRT)` = p_lrt, `AIC log` = aic_log,
+         `AIC spline` = aic_spline, Decisão = decisao) |>
+  knitr::kable()
+```
+
+Na creatinina, a relação linear com o logit do risco foi rejeitada (p = `r num_p(forma$p_lrt[1])`) e o logaritmo teve AIC menor do que a spline (`r num(forma$aic_log[1], 1)` contra `r num(forma$aic_spline[1], 1)`); a creatinina entrou nos modelos em logaritmo. Na CPK, a relação linear não foi rejeitada (p = `r num_p(forma$p_lrt[2])`) e a variável entrou como está.
+
+Com `r n_mortes` mortes, o modelo 1 tem `r num(epp_1, 1)` mortes por parâmetro e o modelo 4 tem `r num(epp_4, 1)`, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.
+
+### Discriminação
+
+```{r}
+#| label: auc-aparente
+# AUC aparente: o modelo prevê os mesmos dados em que foi ajustado (otimista).
+prob1 <- ajustar(f1, dataset)
+prob4 <- ajustar(f4, dataset)
+
+roc1 <- roc(dataset$y, prob1, quiet = TRUE)
+roc4 <- roc(dataset$y, prob4, quiet = TRUE)
+ci1  <- ci.auc(roc1)
+ci4  <- ci.auc(roc4)
+```
+
+```{r}
+#| label: validacao-cruzada
+# Validação cruzada em 10 partes: em cada iteração, treina nas 9 e prevê na
+# que ficou de fora. As mesmas partes para os modelos 1 e 4 (comparação justa).
+set.seed(2026)
+dataset <- dataset |> mutate(parte = sample(rep(1:10, length.out = n())))
+
+pcv1 <- numeric(nrow(dataset))
+pcv4 <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+
+  pcv1[dataset$parte == k] <- ajustar(f1, treino, teste)
+  pcv4[dataset$parte == k] <- ajustar(f4, treino, teste)
+}
+
+roc_cv1 <- roc(dataset$y, pcv1, quiet = TRUE)
+roc_cv4 <- roc(dataset$y, pcv4, quiet = TRUE)
+ci_cv1  <- ci.auc(roc_cv1)
+ci_cv4  <- ci.auc(roc_cv4)
+```
+
+A @tbl-auc compara a AUC aparente com a AUC da validação cruzada; a diferença entre as duas é o otimismo.
+
+```{r}
+#| label: tbl-auc
+#| tbl-cap: "AUC aparente e validada (validação cruzada em 10 partes), com IC 95 % (DeLong)."
+linha_auc <- function(modelo, roc_ap, roc_cv) {
+  ic_ap <- ci.auc(roc_ap)
+  ic_cv <- ci.auc(roc_cv)
+  tibble(
+    Modelo                  = modelo,
+    `AUC aparente (IC 95 %)` = paste0(num(auc(roc_ap)), " (", num(ic_ap[1]), "–", num(ic_ap[3]), ")"),
+    `AUC validada (IC 95 %)` = paste0(num(auc(roc_cv)), " (", num(ic_cv[1]), "–", num(ic_cv[3]), ")"),
+    Otimismo                = num(auc(roc_ap) - auc(roc_cv))
+  )
+}
+
+bind_rows(
+  linha_auc("Modelo 1", roc1, roc_cv1),
+  linha_auc("Modelo 4", roc4, roc_cv4)
+) |>
+  knitr::kable()
+```
+
+A AUC aparente foi `r num_ic(auc(roc1), ci1[1], ci1[3])` no modelo 1 e `r num_ic(auc(roc4), ci4[1], ci4[3])` no modelo 4. Na validação cruzada, desceu para `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4: o otimismo foi `r num(auc(roc1) - auc(roc_cv1))` no modelo 1 e `r num(auc(roc4) - auc(roc_cv4))` no modelo 4 (@fig-roc).
+
+```{r}
+#| label: fig-roc
+#| fig-cap: "Curvas ROC dos modelos 1 e 4. A diagonal tracejada é a discriminação ao acaso."
+#| fig-subcap:
+#|   - "Aparente"
+#|   - "Validação cruzada (10 partes)"
+#| layout-ncol: 2
+#| fig-width: 5
+#| fig-height: 4.5
+grafico_roc <- function(lista) {
+  ggroc(lista) +
+    geom_abline(intercept = 1, slope = 1, linetype = "dashed", colour = "grey50") +
+    labs(x = "Especificidade", y = "Sensibilidade", colour = NULL) +
+    theme_minimal() +
+    theme(legend.position = "bottom", legend.direction = "vertical")
+}
+
+grafico_roc(setNames(list(roc1, roc4),
+                     c(legenda_auc("Modelo 1", roc1), legenda_auc("Modelo 4", roc4))))
+
+grafico_roc(setNames(list(roc_cv1, roc_cv4),
+                     c(legenda_auc("Modelo 1", roc_cv1), legenda_auc("Modelo 4", roc_cv4))))
+```
+
+### Comparação principal: modelo 1 contra modelo 4
+
+```{r}
+#| label: comparacao
+# Sobre as previsões da validação cruzada, não as aparentes.
+# paired = TRUE: os mesmos 299 doentes nos dois modelos → DeLong emparelhado.
+# O IC da diferença é o que interessa; um p > 0,05 não prova que são iguais.
+comp     <- roc.test(roc_cv1, roc_cv4, paired = TRUE, method = "delong")
+# O IC do roc.test() é de (modelo 1 − modelo 4); trocam-se os limites e o
+# sinal para ficar na mesma direção da diferença (modelo 4 − modelo 1).
+dif_auc  <- auc(roc_cv4) - auc(roc_cv1)
+dif_inf  <- -comp$conf.int[2]
+dif_sup  <- -comp$conf.int[1]
+dif_p    <- comp$p.value
+```
+
+Na validação cruzada, a AUC do modelo 4 foi superior à do modelo 1 em `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)` (DeLong, emparelhado).
+
+### Calibração
+
+```{r}
+#| label: calibracao
+# Previsões da validação cruzada: nos dados de ajuste, a calibração é perfeita
+# por construção.
+dados_cv1 <- data.frame(y = dataset$y, p = pcv1)
+dados_cv4 <- data.frame(y = dataset$y, p = pcv4)
+
+cal1 <- calibracao(dados_cv1)
+cal4 <- calibracao(dados_cv4)
+
+res_cal1 <- resumo_calibracao(dados_cv1)
+res_cal4 <- resumo_calibracao(dados_cv4)
+```
+
+A @tbl-calibracao resume a calibração dos dois modelos e a @fig-calibracao mostra-a por decis.
+
+```{r}
+#| label: tbl-calibracao
+#| tbl-cap: "Calibração na validação cruzada. CITL: calibração global (ideal = 0); declive de calibração (ideal = 1)."
+bind_rows(
+  res_cal1 |> mutate(Modelo = "Modelo 1"),
+  res_cal4 |> mutate(Modelo = "Modelo 4")
+) |>
+  transmute(
+    Modelo,
+    `Média prevista`      = num(media_prevista),
+    `Proporção observada` = num(media_observada),
+    `CITL (IC 95 %)`      = paste0(num(citl), " (", num(citl_inf), " a ", num(citl_sup), ")"),
+    `Declive (IC 95 %)`   = paste0(num(declive), " (", num(declive_inf), " a ", num(declive_sup), ")")
+  ) |>
+  knitr::kable()
+```
+
+A calibração global foi boa nos dois modelos: a CITL foi `r num_ic(res_cal1$citl, res_cal1$citl_inf, res_cal1$citl_sup)` no modelo 1 e `r num_ic(res_cal4$citl, res_cal4$citl_inf, res_cal4$citl_sup)` no modelo 4. O declive de calibração foi `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo 1 e `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo 4.
+
+```{r}
+#| label: fig-calibracao
+#| fig-cap: "Calibração na validação cruzada. Cada ponto é um decil de probabilidade prevista (cerca de 30 doentes); a diagonal tracejada é a calibração perfeita."
+#| fig-subcap:
+#|   - "Modelo 1"
+#|   - "Modelo 4"
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 4
+grafico_calibracao <- function(cal) {
+  ggplot(cal, aes(x = prevista, y = observada)) +
+    geom_point() +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = "grey50") +
+    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+    labs(x = "Probabilidade prevista", y = "Proporção observada") +
+    theme_minimal()
+}
+
+grafico_calibracao(cal1)
+grafico_calibracao(cal4)
+```
+
+### Análise de sensibilidade
+
+<!-- Secção 8 do analise.R: ainda por fazer. -->
+
+## Discussão
+
+O resultado principal numa frase. Como se compara com o que se sabia. As limitações do desenho e dos dados, com o efeito provável de cada uma sobre o resultado. O que se faria a seguir.
+
+### Limitações
+
+A base de dados não inclui os tratamentos recebidos, pelo que estes não foram considerados nos modelos. Também não identifica o hospital de cada doente, o que impediu avaliar a heterogeneidade entre centros. A equidade dos modelos não foi avaliada: `r num(100 * mean(dataset$sex), 1)` % dos doentes são homens e todos provêm de uma só população.
+
+### Transportabilidade
+
+Na prática, o modelo 1 usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.
+
+## Declaração de uso de inteligência artificial
+
+Declaramos que na elaboração deste trabalho foi utilizada a seguinte ferramenta de inteligência artificial generativa:
+
+- Ferramenta: [nome e versão]
+- Tipo de assistência: [indicar]
+- Nível HEAT-AI do uso: [mínimo / limitado / alto]
+- Secções em que foi aplicada: [indicar]
+- Prompts utilizados: [lista resumida; os prompts completos, se forem longos, num anexo no fim do relatório]
+- Verificações humanas efetuadas: [indicar]
+- Período de utilização: [de dd/mm a dd/mm]
+
+O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pela ferramenta. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
+
+Se não foi usada IA: "Declaramos que não foi utilizada nenhuma ferramenta de inteligência artificial generativa na elaboração deste trabalho."
+
+Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0); a declaração pode ser gerada no Themis (https://tiagojacinto.eu/fmup-ia/themis/).
+
+## Referências
+
+1. Savarese G, Becher PM, Lund LH, Seferovic P, Rosano GMC, Coats AJS. Global burden of heart failure: a comprehensive and updated review of epidemiology. Cardiovasc Res. 2023;118(17):3272–87. doi:10.1093/cvr/cvac013
+
+2. Baptista R, Rodrigues AM, Bernardo F, Mendes LL, Franco F, Pimenta J, et al. Heart failure in the Portuguese population aged ≥50 years: prevalence and phenotypes in the PORTHOS study. Eur Heart J. 2026;47(34):4806–22. doi:10.1093/eurheartj/ehag030
+
+3. Ahmad T, Munir A, Bhatti SH, Aftab M, Raza MA. Survival analysis of heart failure patients: a case study. PLoS One. 2017;12(7):e0181001. doi:10.1371/journal.pone.0181001
+
+4. Chicco D, Jurman G. Machine learning can predict survival of patients with heart failure from serum creatinine and ejection fraction alone. BMC Med Inform Decis Mak. 2020;20(1):16. doi:10.1186/s12911-020-1023-5
+
+5. Collins GS, Moons KGM, Dhiman P, Riley RD, Beam AL, Van Calster B, et al. TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods. BMJ. 2024;385:e078378. doi:10.1136/bmj-2023-078378
+
+## Anexo A: coeficientes dos modelos
+
+A @tbl-coeficientes apresenta os coeficientes (β) dos dois modelos, ajustados a todos os doentes. Para aplicar a equação, soma-se a ordenada na origem ao produto de cada β pelo valor da variável, obtendo-se o preditor linear (PL); a probabilidade prevista de morte é $p = e^{PL} / (1 + e^{PL})$.
+
+```{r}
+#| label: tbl-coeficientes
+#| tbl-cap: "Coeficientes (β) dos modelos de regressão logística, na escala do logit."
+# num_beta(): 4 algarismos significativos, porque alguns β são muito pequenos.
+num_beta <- function(x) {
+  gsub("-", "−", formatC(x, format = "g", digits = 4, decimal.mark = ","))
+}
+
+rotulos <- c(
+  "(Intercept)"              = "Ordenada na origem",
+  "log(serum_creatinine)"    = "Logaritmo natural da creatinina sérica (mg/dL)",
+  "ejection_fraction"        = "Fração de ejeção (%)",
+  "age"                      = "Idade (anos)",
+  "serum_sodium"             = "Sódio sérico (mEq/L)",
+  "anaemia"                  = "Anemia (1 = sim)",
+  "high_blood_pressure"      = "Hipertensão arterial (1 = sim)",
+  "diabetes"                 = "Diabetes (1 = sim)",
+  "sex"                      = "Sexo (1 = masculino)",
+  "smoking"                  = "Fumador (1 = sim)",
+  "creatinine_phosphokinase" = "CPK (mcg/L)",
+  "platelets"                = "Plaquetas (kiloplaquetas/mL)"
+)
+
+tidy(glm(f4, family = binomial, data = dataset)) |>
+  select(term, beta4 = estimate) |>
+  left_join(
+    tidy(glm(f1, family = binomial, data = dataset)) |>
+      select(term, beta1 = estimate),
+    by = "term"
+  ) |>
+  transmute(
+    Variável     = unname(rotulos[term]),
+    `β modelo 1` = if_else(is.na(beta1), "—", num_beta(beta1)),
+    `β modelo 4` = num_beta(beta4)
+  ) |>
+  knitr::kable()
+```
+
+## Anexo B: lista de verificação TRIPOD+AI {#anexo-tripod}
+
+Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D = desenvolvimento; E = avaliação.
+
+| Item | Tipo | Recomendação (resumida) | Onde está no relatório |
+|--|--|------------|----------|
+| **Título e resumo** | | | |
+| 1 | D;E | Identificar o estudo como desenvolvimento ou avaliação de um modelo de predição, com a população e o desfecho | Título |
+| 2 | D;E | Resumo segundo a TRIPOD+AI para resumos | Resumo |
+| **Introdução** | | | |
+| 3a | D;E | Contexto clínico e racional, com referência a modelos existentes | Introdução (§1–2) |
+| 3b | D;E | População-alvo, finalidade no percurso de cuidados e utilizadores previstos | Introdução (§1) |
+| 3c | D;E | Desigualdades de saúde conhecidas entre grupos sociodemográficos | Discussão – Limitações |
+| 4 | D;E | Objetivos, incluindo se o estudo desenvolve, avalia ou ambos | Introdução (§3–4, objetivo e PICO) |
+| **Métodos** | | | |
+| 5a | D;E | Fontes de dados e sua representatividade | Métodos – Dados |
+| 5b | D;E | Datas de recolha e de fim do seguimento | Métodos – Dados (abr.–dez. 2015; seguimento 4–285 dias) |
+| 6a | D;E | Contexto do estudo, número e localização dos centros | Métodos – Dados (2 hospitais, Faisalabad) |
+| 6b | D;E | Critérios de elegibilidade | Métodos – Dados |
+| 6c | D;E | Tratamentos recebidos e como foram considerados | Não disponível na base; Discussão – Limitações |
+| 7 | D;E | Pré-processamento e controlo de qualidade dos dados | Métodos – Dados |
+| 8a | D;E | Definição do desfecho, horizonte temporal e momento de avaliação | Métodos – Dados |
+| 8b | D;E | Qualificações de quem avalia o desfecho, se subjetivo | Não aplicável (morte é objetiva) |
+| 8c | D;E | Ocultação na avaliação do desfecho | Não aplicável (dados retrospetivos públicos) |
+| 9a | D | Escolha inicial dos preditores e pré-seleção | Métodos – Variáveis (modelo 1 de Chicco e Jurman; modelo 4 com todas) |
+| 9b | D;E | Definição, momento e forma de medição dos preditores | Métodos – Variáveis; Dados (`time` excluído) |
+| 9c | D;E | Qualificações de quem avalia os preditores, se subjetivos | Não aplicável (medições objetivas) |
+| 10 | D;E | Como foi definido o tamanho amostral e porque é suficiente | Métodos – Variáveis (mortes por parâmetro) |
+| 11 | D;E | Tratamento dos dados em falta | Métodos – Dados (sem valores em falta) |
+| 12a | D | Uso e partição dos dados | Métodos – Análise estatística (validação cruzada em 10 partes) |
+| 12b | D | Forma funcional e transformações dos preditores | Métodos – Variáveis (creatinina em log) |
+| 12c | D | Tipo de modelo, construção e validação interna | Métodos – Variáveis; Análise estatística |
+| 12d | D;E | Heterogeneidade entre centros | Não aplicável (a base não identifica o hospital); Limitações |
+| 12e | D;E | Medidas de desempenho e comparação entre modelos | Métodos – Análise estatística |
+| 12f | E | Atualização do modelo (ex.: recalibração) | Não aplicável |
+| 12g | E | Como foram calculadas as predições | Não aplicável (avaliação interna); equação no Anexo A |
+| 13 | D;E | Métodos para classes desequilibradas | Não usados (32 % de mortes); Métodos |
+| 14 | D;E | Abordagens à equidade do modelo | Não avaliada; Discussão – Limitações |
+| 15 | D | Tipo de saída do modelo e limiares | Métodos (probabilidades, sem limiar) |
+| 16 | D;E | Diferenças entre dados de desenvolvimento e de avaliação | Não aplicável (mesma base) |
+| 17 | D;E | Aprovação ética e consentimento | Métodos – Dados (base pública anonimizada; aprovação no estudo original) |
+| **Ciência aberta** | | | |
+| 18a | D;E | Financiamento | Sem financiamento (trabalho académico) |
+| 18b | D;E | Conflitos de interesse | Sem conflitos de interesse |
+| 18c | D;E | Protocolo | Sem protocolo publicado |
+| 18d | D;E | Registo | Não registado |
+| 18e | D;E | Disponibilidade dos dados | Base pública (UCI), incluída no `.zip` |
+| 18f | D;E | Disponibilidade do código | `relatorio.qmd` e `analise.R`, no `.zip` |
+| **Envolvimento de doentes** | | | |
+| 19 | D;E | Envolvimento de doentes e público | Sem envolvimento |
+| **Resultados** | | | |
+| 20a | D;E | Fluxo de participantes, n com e sem desfecho, seguimento | Resultados – Caracterização da amostra |
+| 20b | D;E | Características dos participantes | Resultados – Tabela 1 |
+| 20c | E | Comparação com os dados de desenvolvimento | Não aplicável |
+| 21 | D;E | N de participantes e eventos em cada análise | Resultados; Análise de sensibilidade [A PREENCHER] |
+| 22 | D | Modelo completo, para outros o poderem aplicar | Anexo A – Coeficientes |
+| 23a | D;E | Desempenho com IC, incluindo subgrupos | Resultados – Discriminação, Comparação principal, Calibração |
+| 23b | D;E | Heterogeneidade do desempenho entre centros | Não aplicável |
+| 24 | E | Resultados de atualização do modelo | Não aplicável |
+| **Discussão** | | | |
+| 25 | D;E | Interpretação geral, incluindo equidade e estudos anteriores | Discussão (§1–3) |
+| 26 | D;E | Limitações e efeito sobre viés, incerteza e generalização | Discussão – Limitações |
+| 27a | D | Como lidar com dados em falta ou de má qualidade na prática | Discussão – Transportabilidade |
+| 27b | D | Interação dos utilizadores com o modelo e competências exigidas | Discussão – Transportabilidade |
+| 27c | D;E | Próximos passos de investigação | Discussão – Próximos passos |
+
+## Anexo C: ambiente de execução
+
+```{r}
+#| label: sessao
+#| code-fold: false
+# sessionInfo(): mostra versões de R, sistema e pacotes, para documentar o
+# ambiente de execução.
+sessionInfo()
+```
