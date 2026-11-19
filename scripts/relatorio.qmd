@@ -267,13 +267,28 @@ A calibração foi avaliada nas previsões da validação cruzada: o gráfico po
 
 <!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
 
-A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. O reporte segue a TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
+A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
 ## Resultados
 
 ### Caracterização da amostra
 
-Os dados incluem `r nrow(dataset)` doentes, dos quais `r sum(dataset$y)` (`r num(100 * mean(dataset$y), 1)` %) morreram durante o seguimento. A @tbl-caracterizacao descreve a amostra por desfecho.
+```{r}
+#| label: resumo-amostra
+#| include: false
+# Medianas por desfecho, para o texto: [["0"]] sobreviveu, [["1"]] morreu.
+mediana_por <- function(variavel) tapply(dataset[[variavel]], dataset$y, median)
+med_idade <- mediana_por("age")
+med_fe    <- mediana_por("ejection_fraction")
+med_creat <- mediana_por("serum_creatinine")
+med_tempo <- mediana_por("time")
+tempo_iiq <- quantile(dataset$time, c(0.25, 0.75))
+
+# num_curto(): vírgula decimal sem zeros finais (172 em vez de 172,0).
+num_curto <- function(x) format(x, decimal.mark = ",", drop0trailing = TRUE, trim = TRUE)
+```
+
+Os dados incluem `r nrow(dataset)` doentes, dos quais `r sum(dataset$y)` (`r num(100 * mean(dataset$y), 1)` %) morreram durante o seguimento, com mediana de `r num_curto(median(dataset$time))` dias (IIQ `r num_curto(tempo_iiq[1])`–`r num_curto(tempo_iiq[2])`). A @tbl-caracterizacao descreve a amostra por desfecho. Os doentes que morreram eram mais velhos (mediana de `r num_curto(med_idade[["1"]])` contra `r num_curto(med_idade[["0"]])` anos), tinham fração de ejeção mais baixa (`r num_curto(med_fe[["1"]])` contra `r num_curto(med_fe[["0"]])` %) e creatinina mais alta (`r num(med_creat[["1"]], 1)` contra `r num(med_creat[["0"]], 1)` mg/dL). O seguimento foi mais curto nos que morreram (mediana de `r num_curto(med_tempo[["1"]])` contra `r num_curto(med_tempo[["0"]])` dias), o que confirma a razão para excluir o tempo de seguimento dos modelos.
 
 ```{r}
 #| label: tbl-caracterizacao
@@ -311,7 +326,7 @@ dataset |>
 
 ### Forma das variáveis contínuas
 
-A @fig-histogramas mostra a distribuição das variáveis contínuas. A creatinina e a CPK são assimétricas à direita; as restantes são aproximadamente simétricas.
+A @fig-histogramas mostra a distribuição das variáveis contínuas. A creatinina e a CPK são assimétricas à direita: a maioria dos doentes tem valores baixos (creatinina: mediana de `r num(median(dataset$serum_creatinine), 2)` mg/dL e 3.º quartil de `r num(quantile(dataset$serum_creatinine, 0.75), 2)` mg/dL), mas há uma cauda longa de poucos doentes com valores muito altos (até `r num(max(dataset$serum_creatinine), 1)` mg/dL). O logaritmo comprime os valores altos: na CPK, a distribuição fica quase simétrica, enquanto na creatinina se mantém uma cauda à direita. A idade, a fração de ejeção, o sódio e as plaquetas têm distribuição aproximadamente simétrica. O histograma não decide a forma da variável, mas mostra doentes muito afastados dos restantes, que numa reta pesam muito na inclinação; a decisão vem da relação com o risco e do teste da forma.
 
 ```{r}
 #| label: fig-histogramas
@@ -346,7 +361,7 @@ histograma(dataset$serum_sodium, "Sódio sérico (mEq/L)")
 histograma(dataset$platelets, "Plaquetas (kiloplaquetas/mL)")
 ```
 
-A @fig-logit-creatinina mostra o logit da proporção de mortes por decil da creatinina, na escala original e em logaritmo.
+A @fig-logit-creatinina mostra o logit da proporção de mortes por decil da creatinina, na escala original e em logaritmo. Cada ponto corresponde a um decil (cerca de `r round(nrow(dataset) / 10)` doentes) e tem a mesma altura nos dois gráficos: o logaritmo só altera o espaçamento na horizontal. Com tão poucos doentes por ponto há muito ruído, e a diferença visual entre as duas formas é pequena, pelo que a decisão ficou para o teste da forma.
 
 ```{r}
 #| label: fig-logit-creatinina
@@ -405,7 +420,6 @@ forma |>
 
 Na creatinina, a relação linear com o logit do risco foi rejeitada (p = `r num_p(forma$p_lrt[1])`) e o logaritmo teve AIC menor do que a spline (`r num(forma$aic_log[1], 1)` contra `r num(forma$aic_spline[1], 1)`); a creatinina entrou nos modelos em logaritmo. Na CPK, a relação linear não foi rejeitada (p = `r num_p(forma$p_lrt[2])`) e a variável entrou como está.
 
-Com `r n_mortes` mortes, o modelo 1 tem `r num(epp_1, 1)` mortes por parâmetro e o modelo 4 tem `r num(epp_4, 1)`, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.
 
 ### Discriminação
 
@@ -468,7 +482,7 @@ bind_rows(
   knitr::kable()
 ```
 
-A AUC aparente foi `r num_ic(auc(roc1), ci1[1], ci1[3])` no modelo 1 e `r num_ic(auc(roc4), ci4[1], ci4[3])` no modelo 4. Na validação cruzada, desceu para `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4: o otimismo foi `r num(auc(roc1) - auc(roc_cv1))` no modelo 1 e `r num(auc(roc4) - auc(roc_cv4))` no modelo 4 (@fig-roc).
+A AUC aparente foi `r num_ic(auc(roc1), ci1[1], ci1[3])` no modelo 1 e `r num_ic(auc(roc4), ci4[1], ci4[3])` no modelo 4. Na validação cruzada, desceu para `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4: o otimismo foi `r num(auc(roc1) - auc(roc_cv1))` no modelo 1 e `r num(auc(roc4) - auc(roc_cv4))` no modelo 4 (@fig-roc). O modelo 4 perdeu mais discriminação na validação cruzada do que o modelo 1, o que é coerente com o menor número de mortes por parâmetro (`r num(epp_4, 1)` contra `r num(epp_1, 1)`).
 
 ```{r}
 #| label: fig-roc
@@ -510,7 +524,7 @@ dif_sup  <- -comp$conf.int[1]
 dif_p    <- comp$p.value
 ```
 
-Na validação cruzada, a AUC do modelo 4 foi superior à do modelo 1 em `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)` (DeLong, emparelhado).
+Na validação cruzada, a diferença de AUC entre o modelo 4 e o modelo 1 foi de `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)` (DeLong, emparelhado). Como o IC inclui 0, os dados são compatíveis com a ausência de diferença, mas também com uma vantagem do modelo 4 de até `r num(dif_sup)`. Não permitem, portanto, afirmar que os modelos são equivalentes nem que o modelo 4 é melhor.
 
 ### Calibração
 
@@ -547,7 +561,7 @@ bind_rows(
   knitr::kable()
 ```
 
-A calibração global foi boa nos dois modelos: a CITL foi `r num_ic(res_cal1$citl, res_cal1$citl_inf, res_cal1$citl_sup)` no modelo 1 e `r num_ic(res_cal4$citl, res_cal4$citl_inf, res_cal4$citl_sup)` no modelo 4. O declive de calibração foi `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo 1 e `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo 4.
+Nos dois modelos, a média prevista foi próxima da proporção observada, e a CITL foi próxima de 0: `r num_ic(res_cal1$citl, res_cal1$citl_inf, res_cal1$citl_sup)` no modelo 1 e `r num_ic(res_cal4$citl, res_cal4$citl_inf, res_cal4$citl_sup)` no modelo 4. O declive de calibração foi de `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo 1 e de `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo 4. No modelo 4, o declive abaixo de 1 sugere previsões demasiado extremas, compatíveis com sobreajustamento, mas o IC inclui 1, pelo que os dados não chegam para o confirmar. Os IC largos refletem o número reduzido de mortes (`r n_mortes`).
 
 ```{r}
 #| label: fig-calibracao

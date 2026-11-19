@@ -2394,7 +2394,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Data de Publicação</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">18 de novembro de 2026</p>
+      <p class="date">19 de novembro de 2026</p>
     </div>
   </div>
   
@@ -2449,14 +2449,14 @@ window.Quarto = {
 <p>A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), com IC 95 % e teste de DeLong emparelhado, sem declarar equivalência.</p>
 <p>A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a <em>calibration-in-the-large</em> (ideal 0) e o declive (ideal 1), com IC 95 %.</p>
 <!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
-<p>A análise foi feita em R 4.6.1 com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. O reporte segue a TRIPOD+AI; a lista de verificação encontra-se no <a href="#anexo-tripod">Anexo B</a>.</p>
+<p>A análise foi feita em R 4.6.1 com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se no <a href="#anexo-tripod">Anexo B</a>.</p>
 </section>
 </section>
 <section id="resultados" class="level2">
 <h2 class="anchored" data-anchor-id="resultados">Resultados</h2>
 <section id="caracterização-da-amostra" class="level3">
 <h3 class="anchored" data-anchor-id="caracterização-da-amostra">Caracterização da amostra</h3>
-<p>Os dados incluem 299 doentes, dos quais 96 (32,1 %) morreram durante o seguimento. A <a href="#tbl-caracterizacao" class="quarto-xref">Tabela 1</a> descreve a amostra por desfecho.</p>
+<p>Os dados incluem 299 doentes, dos quais 96 (32,1 %) morreram durante o seguimento, com mediana de 115 dias (IIQ 73–203). A <a href="#tbl-caracterizacao" class="quarto-xref">Tabela 1</a> descreve a amostra por desfecho. Os doentes que morreram eram mais velhos (mediana de 65 contra 60 anos), tinham fração de ejeção mais baixa (30 contra 38 %) e creatinina mais alta (1,3 contra 1,0 mg/dL). O seguimento foi mais curto nos que morreram (mediana de 44,5 contra 172 dias), o que confirma a razão para excluir o tempo de seguimento dos modelos.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Mostrar o código</summary>
@@ -2497,20 +2497,20 @@ Tabela 1: Características dos doentes por desfecho. Contínuas em mediana [IIQ
 </figcaption>
 <div aria-describedby="tbl-caracterizacao-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="cell-output-display">
-<div id="xnnlgpvrko" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#xnnlgpvrko table {
+<div id="cdnjvdtvyv" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#cdnjvdtvyv table {
 font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#xnnlgpvrko thead, #xnnlgpvrko tbody, #xnnlgpvrko tfoot, #xnnlgpvrko tr, #xnnlgpvrko td, #xnnlgpvrko th {
+#cdnjvdtvyv thead, #cdnjvdtvyv tbody, #cdnjvdtvyv tfoot, #cdnjvdtvyv tr, #cdnjvdtvyv td, #cdnjvdtvyv th {
 border-style: none;
 }
-#xnnlgpvrko p {
+#cdnjvdtvyv p {
 margin: 0;
 padding: 0;
 }
-#xnnlgpvrko .gt_table {
+#cdnjvdtvyv .gt_table {
 display: table;
 border-collapse: collapse;
 line-height: normal;
@@ -2535,11 +2535,11 @@ border-left-style: none;
 border-left-width: 2px;
 border-left-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_caption {
+#cdnjvdtvyv .gt_caption {
 padding-top: 4px;
 padding-bottom: 4px;
 }
-#xnnlgpvrko .gt_title {
+#cdnjvdtvyv .gt_title {
 color: #333333;
 font-size: 125%;
 font-weight: initial;
@@ -2550,7 +2550,7 @@ padding-right: 5px;
 border-bottom-color: #FFFFFF;
 border-bottom-width: 0;
 }
-#xnnlgpvrko .gt_subtitle {
+#cdnjvdtvyv .gt_subtitle {
 color: #333333;
 font-size: 85%;
 font-weight: initial;
@@ -2561,7 +2561,7 @@ padding-right: 5px;
 border-top-color: #FFFFFF;
 border-top-width: 0;
 }
-#xnnlgpvrko .gt_heading {
+#cdnjvdtvyv .gt_heading {
 background-color: #FFFFFF;
 text-align: center;
 border-bottom-color: #FFFFFF;
@@ -2572,12 +2572,12 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_bottom_border {
+#cdnjvdtvyv .gt_bottom_border {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_col_headings {
+#cdnjvdtvyv .gt_col_headings {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -2591,7 +2591,7 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_col_heading {
+#cdnjvdtvyv .gt_col_heading {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2610,7 +2610,7 @@ padding-left: 5px;
 padding-right: 5px;
 overflow-x: hidden;
 }
-#xnnlgpvrko .gt_column_spanner_outer {
+#cdnjvdtvyv .gt_column_spanner_outer {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2621,13 +2621,13 @@ padding-bottom: 0;
 padding-left: 4px;
 padding-right: 4px;
 }
-#xnnlgpvrko .gt_column_spanner_outer:first-child {
+#cdnjvdtvyv .gt_column_spanner_outer:first-child {
 padding-left: 0;
 }
-#xnnlgpvrko .gt_column_spanner_outer:last-child {
+#cdnjvdtvyv .gt_column_spanner_outer:last-child {
 padding-right: 0;
 }
-#xnnlgpvrko .gt_column_spanner {
+#cdnjvdtvyv .gt_column_spanner {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
@@ -2638,10 +2638,10 @@ overflow-x: hidden;
 display: inline-block;
 width: 100%;
 }
-#xnnlgpvrko .gt_spanner_row {
+#cdnjvdtvyv .gt_spanner_row {
 border-bottom-style: hidden;
 }
-#xnnlgpvrko .gt_group_heading {
+#cdnjvdtvyv .gt_group_heading {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2666,7 +2666,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 text-align: left;
 }
-#xnnlgpvrko .gt_empty_group_heading {
+#cdnjvdtvyv .gt_empty_group_heading {
 padding: 0.5px;
 color: #333333;
 background-color: #FFFFFF;
@@ -2680,13 +2680,13 @@ border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 vertical-align: middle;
 }
-#xnnlgpvrko .gt_from_md > :first-child {
+#cdnjvdtvyv .gt_from_md > :first-child {
 margin-top: 0;
 }
-#xnnlgpvrko .gt_from_md > :last-child {
+#cdnjvdtvyv .gt_from_md > :last-child {
 margin-bottom: 0;
 }
-#xnnlgpvrko .gt_row {
+#cdnjvdtvyv .gt_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2704,7 +2704,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 overflow-x: hidden;
 }
-#xnnlgpvrko .gt_stub {
+#cdnjvdtvyv .gt_stub {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2716,7 +2716,7 @@ border-right-color: #D3D3D3;
 padding-left: 5px;
 padding-right: 5px;
 }
-#xnnlgpvrko .gt_stub_row_group {
+#cdnjvdtvyv .gt_stub_row_group {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2729,13 +2729,13 @@ padding-left: 5px;
 padding-right: 5px;
 vertical-align: top;
 }
-#xnnlgpvrko .gt_row_group_first td {
+#cdnjvdtvyv .gt_row_group_first td {
 border-top-width: 2px;
 }
-#xnnlgpvrko .gt_row_group_first th {
+#cdnjvdtvyv .gt_row_group_first th {
 border-top-width: 2px;
 }
-#xnnlgpvrko .gt_summary_row {
+#cdnjvdtvyv .gt_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -2744,14 +2744,14 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#xnnlgpvrko .gt_first_summary_row {
+#cdnjvdtvyv .gt_first_summary_row {
 border-top-style: solid;
 border-top-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_first_summary_row.thick {
+#cdnjvdtvyv .gt_first_summary_row.thick {
 border-top-width: 2px;
 }
-#xnnlgpvrko .gt_last_summary_row {
+#cdnjvdtvyv .gt_last_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2760,7 +2760,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_grand_summary_row {
+#cdnjvdtvyv .gt_grand_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -2769,7 +2769,7 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#xnnlgpvrko .gt_first_grand_summary_row {
+#cdnjvdtvyv .gt_first_grand_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2778,7 +2778,7 @@ border-top-style: double;
 border-top-width: 6px;
 border-top-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_last_grand_summary_row_top {
+#cdnjvdtvyv .gt_last_grand_summary_row_top {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2787,10 +2787,10 @@ border-bottom-style: double;
 border-bottom-width: 6px;
 border-bottom-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_striped {
+#cdnjvdtvyv .gt_striped {
 background-color: rgba(128, 128, 128, 0.05);
 }
-#xnnlgpvrko .gt_table_body {
+#cdnjvdtvyv .gt_table_body {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -2798,7 +2798,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_footnotes {
+#cdnjvdtvyv .gt_footnotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -2811,7 +2811,7 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_footnote {
+#cdnjvdtvyv .gt_footnote {
 margin: 0px;
 font-size: 90%;
 padding-top: 4px;
@@ -2819,7 +2819,7 @@ padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#xnnlgpvrko .gt_sourcenotes {
+#cdnjvdtvyv .gt_sourcenotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -2832,64 +2832,64 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#xnnlgpvrko .gt_sourcenote {
+#cdnjvdtvyv .gt_sourcenote {
 font-size: 90%;
 padding-top: 4px;
 padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#xnnlgpvrko .gt_left {
+#cdnjvdtvyv .gt_left {
 text-align: left;
 }
-#xnnlgpvrko .gt_center {
+#cdnjvdtvyv .gt_center {
 text-align: center;
 }
-#xnnlgpvrko .gt_right {
+#cdnjvdtvyv .gt_right {
 text-align: right;
 font-variant-numeric: tabular-nums;
 }
-#xnnlgpvrko .gt_font_normal {
+#cdnjvdtvyv .gt_font_normal {
 font-weight: normal;
 }
-#xnnlgpvrko .gt_font_bold {
+#cdnjvdtvyv .gt_font_bold {
 font-weight: bold;
 }
-#xnnlgpvrko .gt_font_italic {
+#cdnjvdtvyv .gt_font_italic {
 font-style: italic;
 }
-#xnnlgpvrko .gt_super {
+#cdnjvdtvyv .gt_super {
 font-size: 65%;
 }
-#xnnlgpvrko .gt_footnote_marks {
+#cdnjvdtvyv .gt_footnote_marks {
 font-size: 75%;
 vertical-align: 0.4em;
 position: initial;
 }
-#xnnlgpvrko .gt_asterisk {
+#cdnjvdtvyv .gt_asterisk {
 font-size: 100%;
 vertical-align: 0;
 }
-#xnnlgpvrko .gt_indent_1 {
+#cdnjvdtvyv .gt_indent_1 {
 text-indent: 5px;
 }
-#xnnlgpvrko .gt_indent_2 {
+#cdnjvdtvyv .gt_indent_2 {
 text-indent: 10px;
 }
-#xnnlgpvrko .gt_indent_3 {
+#cdnjvdtvyv .gt_indent_3 {
 text-indent: 15px;
 }
-#xnnlgpvrko .gt_indent_4 {
+#cdnjvdtvyv .gt_indent_4 {
 text-indent: 20px;
 }
-#xnnlgpvrko .gt_indent_5 {
+#cdnjvdtvyv .gt_indent_5 {
 text-indent: 25px;
 }
-#xnnlgpvrko .katex-display {
+#cdnjvdtvyv .katex-display {
 display: inline-flex !important;
 margin-bottom: 0.75em !important;
 }
-#xnnlgpvrko div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#cdnjvdtvyv div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
 height: 0px !important;
 }
 </style>
@@ -2996,7 +2996,7 @@ N = 96<span class="gt_footnote_marks" style="white-space:nowrap;font-style:itali
 </section>
 <section id="forma-das-variáveis-contínuas" class="level3">
 <h3 class="anchored" data-anchor-id="forma-das-variáveis-contínuas">Forma das variáveis contínuas</h3>
-<p>A <a href="#fig-histogramas" class="quarto-xref">Figura 1</a> mostra a distribuição das variáveis contínuas. A creatinina e a CPK são assimétricas à direita; as restantes são aproximadamente simétricas.</p>
+<p>A <a href="#fig-histogramas" class="quarto-xref">Figura 1</a> mostra a distribuição das variáveis contínuas. A creatinina e a CPK são assimétricas à direita: a maioria dos doentes tem valores baixos (creatinina: mediana de 1,10 mg/dL e 3.º quartil de 1,40 mg/dL), mas há uma cauda longa de poucos doentes com valores muito altos (até 9,4 mg/dL). O logaritmo comprime os valores altos: na CPK, a distribuição fica quase simétrica, enquanto na creatinina se mantém uma cauda à direita. A idade, a fração de ejeção, o sódio e as plaquetas têm distribuição aproximadamente simétrica. O histograma não decide a forma da variável, mas mostra doentes muito afastados dos restantes, que numa reta pesam muito na inclinação; a decisão vem da relação com o risco e do teste da forma.</p>
 <details class="code-fold">
 <summary>Mostrar o código</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># histograma(): o mesmo gráfico para cada variável, para não repetir código.</span></span>
@@ -3129,7 +3129,7 @@ Figura 1: Distribuição das variáveis contínuas.
 </figcaption>
 </figure>
 </div>
-<p>A <a href="#fig-logit-creatinina" class="quarto-xref">Figura 2</a> mostra o logit da proporção de mortes por decil da creatinina, na escala original e em logaritmo.</p>
+<p>A <a href="#fig-logit-creatinina" class="quarto-xref">Figura 2</a> mostra o logit da proporção de mortes por decil da creatinina, na escala original e em logaritmo. Cada ponto corresponde a um decil (cerca de 30 doentes) e tem a mesma altura nos dois gráficos: o logaritmo só altera o espaçamento na horizontal. Com tão poucos doentes por ponto há muito ruído, e a diferença visual entre as duas formas é pequena, pelo que a decisão ficou para o teste da forma.</p>
 <details class="code-fold">
 <summary>Mostrar o código</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>decis_creat <span class="ot">&lt;-</span> <span class="fu">logit_por_decil</span>(dataset, serum_creatinine)</span>
@@ -3250,7 +3250,6 @@ Tabela 2: Teste da forma das variáveis assimétricas. LRT: modelo linear contr
 </div>
 </div>
 <p>Na creatinina, a relação linear com o logit do risco foi rejeitada (p = 0,032) e o logaritmo teve AIC menor do que a spline (323,0 contra 327,4); a creatinina entrou nos modelos em logaritmo. Na CPK, a relação linear não foi rejeitada (p = 0,095) e a variável entrou como está.</p>
-<p>Com 96 mortes, o modelo 1 tem 32,0 mortes por parâmetro e o modelo 4 tem 8,0, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.</p>
 </section>
 <section id="discriminação" class="level3">
 <h3 class="anchored" data-anchor-id="discriminação">Discriminação</h3>
@@ -3349,7 +3348,7 @@ Tabela 3: AUC aparente e validada (validação cruzada em 10 partes), com IC 95
 </figure>
 </div>
 </div>
-<p>A AUC aparente foi 0,767 (IC 95 % 0,706 a 0,828) no modelo 1 e 0,814 (IC 95 % 0,761 a 0,867) no modelo 4. Na validação cruzada, desceu para 0,761 (IC 95 % 0,699 a 0,822) no modelo 1 e 0,781 (IC 95 % 0,724 a 0,838) no modelo 4: o otimismo foi 0,006 no modelo 1 e 0,033 no modelo 4 (<a href="#fig-roc" class="quarto-xref">Figura 3</a>).</p>
+<p>A AUC aparente foi 0,767 (IC 95 % 0,706 a 0,828) no modelo 1 e 0,814 (IC 95 % 0,761 a 0,867) no modelo 4. Na validação cruzada, desceu para 0,761 (IC 95 % 0,699 a 0,822) no modelo 1 e 0,781 (IC 95 % 0,724 a 0,838) no modelo 4: o otimismo foi 0,006 no modelo 1 e 0,033 no modelo 4 (<a href="#fig-roc" class="quarto-xref">Figura 3</a>). O modelo 4 perdeu mais discriminação na validação cruzada do que o modelo 1, o que é coerente com o menor número de mortes por parâmetro (8,0 contra 32,0).</p>
 <details class="code-fold">
 <summary>Mostrar o código</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>grafico_roc <span class="ot">&lt;-</span> <span class="cf">function</span>(lista) {</span>
@@ -3419,7 +3418,7 @@ Figura 3: Curvas ROC dos modelos 1 e 4. A diagonal tracejada é a discriminaç�
 <span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>dif_p    <span class="ot">&lt;-</span> comp<span class="sc">$</span>p.value</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<p>Na validação cruzada, a AUC do modelo 4 foi superior à do modelo 1 em 0,021 (IC 95 % −0,019 a 0,061), com p = 0,309 (DeLong, emparelhado).</p>
+<p>Na validação cruzada, a diferença de AUC entre o modelo 4 e o modelo 1 foi de 0,021 (IC 95 % −0,019 a 0,061), com p = 0,309 (DeLong, emparelhado). Como o IC inclui 0, os dados são compatíveis com a ausência de diferença, mas também com uma vantagem do modelo 4 de até 0,061. Não permitem, portanto, afirmar que os modelos são equivalentes nem que o modelo 4 é melhor.</p>
 </section>
 <section id="calibração" class="level3">
 <h3 class="anchored" data-anchor-id="calibração">Calibração</h3>
@@ -3501,7 +3500,7 @@ Tabela 4: Calibração na validação cruzada. CITL: calibração global (ideal
 </figure>
 </div>
 </div>
-<p>A calibração global foi boa nos dois modelos: a CITL foi 0,007 (IC 95 % −0,263 a 0,277) no modelo 1 e 0,018 (IC 95 % −0,266 a 0,301) no modelo 4. O declive de calibração foi 0,940 (IC 95 % 0,651 a 1,229) no modelo 1 e 0,831 (IC 95 % 0,594 a 1,067) no modelo 4.</p>
+<p>Nos dois modelos, a média prevista foi próxima da proporção observada, e a CITL foi próxima de 0: 0,007 (IC 95 % −0,263 a 0,277) no modelo 1 e 0,018 (IC 95 % −0,266 a 0,301) no modelo 4. O declive de calibração foi de 0,940 (IC 95 % 0,651 a 1,229) no modelo 1 e de 0,831 (IC 95 % 0,594 a 1,067) no modelo 4. No modelo 4, o declive abaixo de 1 sugere previsões demasiado extremas, compatíveis com sobreajustamento, mas o IC inclui 1, pelo que os dados não chegam para o confirmar. Os IC largos refletem o número reduzido de mortes (96).</p>
 <details class="code-fold">
 <summary>Mostrar o código</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>grafico_calibracao <span class="ot">&lt;-</span> <span class="cf">function</span>(cal) {</span>
