@@ -83,8 +83,9 @@ B.3 Métodos:
   ✔ Rever "registadas na admissão" (Métodos → Variáveis e item 9b do Anexo B): Ahmad et al. (2017) não indica o momento da medição das variáveis @critical @done(26-11-18)
 
 B.4 Resultados:
-  ☐ Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figuras
-  ☐ IC interpretados no texto
+  ✔ Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figuras @done(26-11-19)
+  ✔ IC interpretados no texto @done(26-11-19)
+  ☐ Análise de sensibilidade: escrever os resultados (creatinina linear) na subsecção vazia dos Resultados; depende da secção 8 do analise.R (A.6) @critical
 
 B.5 Discussão:
   ☐ Resultado principal numa frase
