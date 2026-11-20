@@ -17,7 +17,7 @@ dataset <- read_csv(
 names(dataset)
 
 # Desfecho como coluna y DENTRO dos dados, em 0/1 numérico:
-# as funções das secções 4 a 7 usam dados$y e a calibração faz contas com ele
+# as funções das secções 4 a 7 usam dataset$y e a calibração faz contas com ele
 dataset <- dataset |>
   mutate(y = DEATH_EVENT)
 
@@ -25,10 +25,12 @@ dataset <- dataset |>
 # 2. Table 1 ----------------------------------------------------------------
 # Características dos doentes estratificadas pelo desfecho, mais a coluna do total.
 # O fator com rótulos é criado só dentro deste pipe, para não alterar o y
-# numérico guardado em dados.
+# numérico guardado em dataset.
 # O time fica de fora: é o tempo de seguimento, não uma característica do doente.
 # Contínuas em mediana [IIQ]: várias são muito assimétricas (CPK, creatinina).
 # Nas binárias (0/1), o gtsummary conta os doentes com valor 1.
+# Sexo: a codificação 1 = masculino foi inferida por contagem (há 194 doentes
+# com sex = 1, tantos como os homens descritos por Ahmad et al., 2017).
 table_1 <- dataset |>
   mutate(y = factor(y, levels = c(0, 1), labels = c("Sobreviveu", "Morreu"))) |>
   select(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,
@@ -546,4 +548,7 @@ ggplot(cal4_linear, aes(x = prevista, y = observada)) +
        title = "Calibração — Modelo 4 (creatinina linear)") +
   theme_minimal()
 
-# 9. Figuras
+# 9. Figuras -------------------------------------------------------------------
+#
+# Todos os gráficos deste script têm eixos e legendas em português. As versões
+# finais, numeradas e com legenda, são geradas no scripts/relatorio.qmd.
