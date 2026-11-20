@@ -206,21 +206,59 @@ epp_1 <- n_mortes / length(coef(glm(f1, family = binomial, data = dataset)))
 epp_4 <- n_mortes / length(coef(glm(f4, family = binomial, data = dataset)))
 ```
 
+```{r}
+#| label: metricas-resumo
+#| include: false
+prob1 <- ajustar(f1, dataset)
+prob4 <- ajustar(f4, dataset)
+roc1 <- roc(dataset$y, prob1, quiet = TRUE)
+roc4 <- roc(dataset$y, prob4, quiet = TRUE)
+ci1 <- ci.auc(roc1)
+ci4 <- ci.auc(roc4)
+
+set.seed(2026)
+dataset <- dataset |> mutate(parte = sample(rep(1:10, length.out = n())))
+
+pcv1 <- numeric(nrow(dataset))
+pcv4 <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste <- dataset |> filter(parte == k)
+  pcv1[dataset$parte == k] <- ajustar(f1, treino, teste)
+  pcv4[dataset$parte == k] <- ajustar(f4, treino, teste)
+}
+
+roc_cv1 <- roc(dataset$y, pcv1, quiet = TRUE)
+roc_cv4 <- roc(dataset$y, pcv4, quiet = TRUE)
+ci_cv1 <- ci.auc(roc_cv1)
+ci_cv4 <- ci.auc(roc_cv4)
+
+comp <- roc.test(roc_cv1, roc_cv4, paired = TRUE, method = "delong")
+dif_auc <- auc(roc_cv4) - auc(roc_cv1)
+dif_inf <- -comp$conf.int[2]
+dif_sup <- -comp$conf.int[1]
+dif_p <- comp$p.value
+
+dados_cv1 <- data.frame(y = dataset$y, p = pcv1)
+dados_cv4 <- data.frame(y = dataset$y, p = pcv4)
+res_cal1 <- resumo_calibracao(dados_cv1)
+res_cal4 <- resumo_calibracao(dados_cv4)
+```
+
 ## Resumo (abstract)
 
-Entre 250 e 350 palavras, sem referências, sem tabelas. Seis movimentos; cada um responde a uma pergunta.
+**Contexto.** A insuficiência cardíaca tem elevada mortalidade, e a previsão individual do risco de morte pode apoiar a avaliação clínica. Uma análise anterior desta base pública, com *machine learning*, sugeriu que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência.
 
-**Contexto.** Qual é o problema e o que já se sabe? Uma ou duas frases.
+**Lacuna.** Não se sabe se um modelo apenas com estas duas variáveis mantém o desempenho face a um modelo com todas as variáveis clínicas, depois de corrigido o otimismo e avaliada a calibração.
 
-**Lacuna.** O que ainda não se sabe, e que este trabalho responde? Uma frase.
+**Objetivo.** Comparar, após validação interna, a discriminação e a calibração destes dois modelos na previsão da morte durante o seguimento.
 
-**Objetivo.** O que este trabalho faz? Uma frase, com a questão de avaliação implícita.
+**Métodos.** Analisámos `r nrow(dataset)` doentes com insuficiência cardíaca sistólica, em classe III ou IV da NYHA, internados em dois hospitais do Paquistão em 2015, dos quais `r n_mortes` morreram. Ajustámos dois modelos de regressão logística: um modelo reduzido, com o logaritmo da creatinina sérica e a fração de ejeção, e um modelo completo, com as 11 variáveis clínicas. A discriminação foi medida pela área sob a curva ROC (AUC), aparente e corrigida por validação cruzada em 10 partes. A análise principal foi a diferença de AUC validada, com teste de DeLong emparelhado. A calibração foi avaliada pela calibração global (*calibration-in-the-large*, CITL; ideal 0) e pelo declive de calibração (ideal 1).
 
-**Métodos.** Que dados, que desenho, que variáveis, que análise. Duas ou três frases.
+**Resultados.** A AUC validada foi `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo reduzido e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo completo, com otimismo de `r num(auc(roc1) - auc(roc_cv1))` e `r num(auc(roc4) - auc(roc_cv4))`, respetivamente. A AUC validada do modelo completo foi superior em `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)`. A calibração global foi boa nos dois modelos, com CITL de `r num(res_cal1$citl)` e `r num(res_cal4$citl)`. O declive de calibração foi `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo reduzido e `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo completo, cujo valor mais afastado de 1 é compatível com sobreajustamento.
 
-**Resultados.** Os achados principais, com números: estimativas e intervalos de confiança, não só valores de p. Duas ou três frases.
-
-**Conclusões.** O que os resultados significam e para quem. Uma ou duas frases, sem ir além do que os dados mostram.
+**Conclusões.** O modelo reduzido teve discriminação próxima da do modelo completo e menos otimismo. A diferença foi pequena e o intervalo de confiança incluiu a ausência de diferença, o que não demonstra equivalência. É necessária validação externa antes de qualquer uso clínico.
 
 ## Introdução
 
@@ -230,7 +268,7 @@ Na base *Heart Failure Clinical Records* (3), Chicco e Jurman (4) concluíram, a
 
 O objetivo deste trabalho foi comparar, após validação interna, a discriminação e a calibração de um modelo de regressão logística apenas com creatinina sérica e fração de ejeção com as de um modelo com todas as variáveis clínicas, na previsão da morte durante o seguimento.
 
-A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (P), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (I) tem discriminação e calibração semelhantes às de um modelo com todas as variáveis clínicas (C) na previsão da morte durante o seguimento, após validação interna (O)?
+A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo, em classe III ou IV da NYHA (P), um modelo de regressão logística apenas com creatinina sérica e fração de ejeção (I) tem discriminação e calibração semelhantes às de um modelo com todas as variáveis clínicas (C) na previsão da morte durante o seguimento, após validação interna (O)?
 
 ## Métodos
 
@@ -238,9 +276,9 @@ A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuf
 
 Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a *Heart Failure Clinical Records*, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).
 
-Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (3). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
+Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo, em classe III ou IV da NYHA (3). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
 
-O tempo de seguimento (`time`) foi excluído dos modelos, porque só se conhece no fim do seguimento e depende do próprio desfecho: quem morre tem um seguimento mais curto. Usá-lo como preditor seria *data leakage*.
+O tempo de seguimento (`time`) foi excluído dos modelos, porque só se conhece no fim do seguimento e depende do próprio desfecho: quem morre tem um seguimento mais curto. Usá-lo como preditor seria *data leakage* (fuga de informação).
 
 ### Variáveis
 
@@ -251,9 +289,9 @@ A base de dados apresenta no total 13 variáveis: 11 características clínicas,
 
 As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino.
 
-Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline natural de 3 graus de liberdade pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
+A regressão logística assume que cada variável contínua tem uma relação linear com o logit do risco de morte, isto é, que cada unidade a mais altera o risco sempre na mesma medida. Antes de ajustar os modelos, verificámos este pressuposto nas duas variáveis com distribuição assimétrica à direita, a creatinina e a CPK, em que poucos doentes têm valores muito altos. Para cada uma, comparámos a forma linear com uma curva flexível (spline natural com 3 graus de liberdade) pelo teste de razão de verosimilhanças. Se a curva não melhorasse significativamente o ajuste (p ≥ 0,05), mantínhamos a forma linear. Caso contrário, escolhíamos entre o logaritmo e a spline pelo critério de informação de Akaike (AIC), que penaliza a complexidade, ficando a forma com o AIC mais baixo. Por este procedimento, a creatinina entrou nos modelos em logaritmo natural, e a CPK e as restantes variáveis contínuas entraram na escala original.
 
-Definimos, então, dois modelos: o modelo 1, com a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis propostas por Chicco e Jurman (4), e o modelo 4, que inclui as 11 variáveis clínicas. Com `r n_mortes` mortes, o número de mortes por parâmetro, contando a ordenada na origem, foi `r num(epp_1, 1)` no modelo 1 e `r num(epp_4, 1)` no modelo 4. Este último fica abaixo da regra prática de 10, o que faz esperar sobreajustamento.
+Definimos dois modelos. O modelo reduzido inclui apenas a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis que Chicco e Jurman (4) consideraram suficientes. O modelo completo inclui as 11 variáveis clínicas. Para avaliar o risco de sobreajustamento, isto é, de o modelo se adaptar ao ruído destes dados e prever pior em doentes novos, calculámos o número de mortes por parâmetro estimado, contando a ordenada na origem. Com `r n_mortes` mortes, foi `r num(epp_1, 1)` no modelo reduzido e `r num(epp_4, 1)` no modelo completo. O modelo completo fica abaixo da regra prática de 10 mortes por parâmetro, pelo que era de esperar algum sobreajustamento.
 
 ### Análise estatística
 
@@ -261,11 +299,9 @@ As variáveis contínuas foram descritas por mediana e intervalo interquartil e 
 
 A discriminação foi medida pela AUC, com IC de 95 % pelo método de DeLong. Calculámos primeiro a AUC aparente, nos mesmos dados do ajuste. Para corrigir o otimismo, usámos validação cruzada em 10 partes: cada doente foi previsto por um modelo ajustado sem ele, com as mesmas partes para os dois modelos e a semente 2026. O otimismo é a diferença entre a AUC aparente e a validada.
 
-A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), com IC 95 % e teste de DeLong emparelhado, sem declarar equivalência.
+A comparação baseou-se na diferença de AUC validada (modelo completo − modelo reduzido), com IC 95 % e teste de DeLong emparelhado, sem declarar equivalência.
 
 A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a *calibration-in-the-large* (ideal 0) e o declive (ideal 1), com IC 95 %.
-
-Como análise de sensibilidade, repetimos a validação cruzada em 10 partes, a comparação das AUC e a avaliação da calibração substituindo o logaritmo da creatinina pela sua forma linear. Usámos as mesmas partes e a mesma semente da análise principal.
 
 A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. O reporte segue a TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
@@ -374,16 +410,16 @@ ggplot(decis_creat, aes(x = log(mediana), y = logit)) +
   theme_minimal()
 ```
 
-A @tbl-forma mostra o teste da forma: a creatinina foi testada no modelo 1 e a CPK no modelo 4, já com a creatinina em logaritmo.
+A @tbl-forma mostra o teste da forma: a creatinina foi testada no modelo reduzido e a CPK no modelo completo, já com a creatinina em logaritmo.
 
 ```{r}
 #| label: tbl-forma
 #| tbl-cap: "Teste da forma das variáveis assimétricas. LRT: modelo linear contra spline (3 graus de liberdade); AIC: logaritmo contra spline."
 forma <- bind_rows(
-  # Creatinina no modelo 1 (2 variáveis)
+  # Creatinina no modelo reduzido (2 variáveis)
   teste_forma(dataset, y ~ ejection_fraction + serum_creatinine,
               "serum_creatinine"),
-  # CPK no modelo 4 (11 variáveis; creatinina já em log)
+  # CPK no modelo completo (11 variáveis; creatinina já em log)
   teste_forma(dataset,
     y ~ age + anaemia + diabetes + high_blood_pressure + sex + smoking +
         ejection_fraction + log(serum_creatinine) + serum_sodium +
@@ -405,45 +441,9 @@ forma |>
 
 Na creatinina, a relação linear com o logit do risco foi rejeitada (p = `r num_p(forma$p_lrt[1])`) e o logaritmo teve AIC menor do que a spline (`r num(forma$aic_log[1], 1)` contra `r num(forma$aic_spline[1], 1)`); a creatinina entrou nos modelos em logaritmo. Na CPK, a relação linear não foi rejeitada (p = `r num_p(forma$p_lrt[2])`) e a variável entrou como está.
 
-Com `r n_mortes` mortes, o modelo 1 tem `r num(epp_1, 1)` mortes por parâmetro e o modelo 4 tem `r num(epp_4, 1)`, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.
+Com `r n_mortes` mortes, o modelo reduzido tem `r num(epp_1, 1)` mortes por parâmetro e o modelo completo tem `r num(epp_4, 1)`, abaixo das 10 recomendadas, o que o expõe a sobreajustamento.
 
 ### Discriminação
-
-```{r}
-#| label: auc-aparente
-# AUC aparente: o modelo prevê os mesmos dados em que foi ajustado (otimista).
-prob1 <- ajustar(f1, dataset)
-prob4 <- ajustar(f4, dataset)
-
-roc1 <- roc(dataset$y, prob1, quiet = TRUE)
-roc4 <- roc(dataset$y, prob4, quiet = TRUE)
-ci1  <- ci.auc(roc1)
-ci4  <- ci.auc(roc4)
-```
-
-```{r}
-#| label: validacao-cruzada
-# Validação cruzada em 10 partes: em cada iteração, treina nas 9 e prevê na
-# que ficou de fora. As mesmas partes para os modelos 1 e 4 (comparação justa).
-set.seed(2026)
-dataset <- dataset |> mutate(parte = sample(rep(1:10, length.out = n())))
-
-pcv1 <- numeric(nrow(dataset))
-pcv4 <- numeric(nrow(dataset))
-
-for (k in 1:10) {
-  treino <- dataset |> filter(parte != k)
-  teste  <- dataset |> filter(parte == k)
-
-  pcv1[dataset$parte == k] <- ajustar(f1, treino, teste)
-  pcv4[dataset$parte == k] <- ajustar(f4, treino, teste)
-}
-
-roc_cv1 <- roc(dataset$y, pcv1, quiet = TRUE)
-roc_cv4 <- roc(dataset$y, pcv4, quiet = TRUE)
-ci_cv1  <- ci.auc(roc_cv1)
-ci_cv4  <- ci.auc(roc_cv4)
-```
 
 A @tbl-auc compara a AUC aparente com a AUC da validação cruzada; a diferença entre as duas é o otimismo.
 
@@ -462,17 +462,17 @@ linha_auc <- function(modelo, roc_ap, roc_cv) {
 }
 
 bind_rows(
-  linha_auc("Modelo 1", roc1, roc_cv1),
-  linha_auc("Modelo 4", roc4, roc_cv4)
+  linha_auc("Modelo reduzido", roc1, roc_cv1),
+  linha_auc("Modelo completo", roc4, roc_cv4)
 ) |>
   knitr::kable()
 ```
 
-A AUC aparente foi `r num_ic(auc(roc1), ci1[1], ci1[3])` no modelo 1 e `r num_ic(auc(roc4), ci4[1], ci4[3])` no modelo 4. Na validação cruzada, desceu para `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4: o otimismo foi `r num(auc(roc1) - auc(roc_cv1))` no modelo 1 e `r num(auc(roc4) - auc(roc_cv4))` no modelo 4 (@fig-roc).
+A AUC aparente foi `r num_ic(auc(roc1), ci1[1], ci1[3])` no modelo reduzido e `r num_ic(auc(roc4), ci4[1], ci4[3])` no modelo completo. Na validação cruzada, desceu para `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo reduzido e `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo completo: o otimismo foi `r num(auc(roc1) - auc(roc_cv1))` no modelo reduzido e `r num(auc(roc4) - auc(roc_cv4))` no modelo completo (@fig-roc).
 
 ```{r}
 #| label: fig-roc
-#| fig-cap: "Curvas ROC dos modelos 1 e 4. A diagonal tracejada é a discriminação ao acaso."
+#| fig-cap: "Curvas ROC dos modelos reduzido e completo. A diagonal tracejada é a discriminação ao acaso."
 #| fig-subcap:
 #|   - "Aparente"
 #|   - "Validação cruzada (10 partes)"
@@ -488,44 +488,21 @@ grafico_roc <- function(lista) {
 }
 
 grafico_roc(setNames(list(roc1, roc4),
-                     c(legenda_auc("Modelo 1", roc1), legenda_auc("Modelo 4", roc4))))
+                     c(legenda_auc("Modelo reduzido", roc1), legenda_auc("Modelo completo", roc4))))
 
 grafico_roc(setNames(list(roc_cv1, roc_cv4),
-                     c(legenda_auc("Modelo 1", roc_cv1), legenda_auc("Modelo 4", roc_cv4))))
+                     c(legenda_auc("Modelo reduzido", roc_cv1), legenda_auc("Modelo completo", roc_cv4))))
 ```
 
-### Comparação principal: modelo 1 contra modelo 4
+### Comparação principal: modelo reduzido contra modelo completo
 
-```{r}
-#| label: comparacao
-# Sobre as previsões da validação cruzada, não as aparentes.
-# paired = TRUE: os mesmos 299 doentes nos dois modelos → DeLong emparelhado.
-# O IC da diferença é o que interessa; um p > 0,05 não prova que são iguais.
-comp     <- roc.test(roc_cv1, roc_cv4, paired = TRUE, method = "delong")
-# O IC do roc.test() é de (modelo 1 − modelo 4); trocam-se os limites e o
-# sinal para ficar na mesma direção da diferença (modelo 4 − modelo 1).
-dif_auc  <- auc(roc_cv4) - auc(roc_cv1)
-dif_inf  <- -comp$conf.int[2]
-dif_sup  <- -comp$conf.int[1]
-dif_p    <- comp$p.value
-```
-
-Na validação cruzada, a AUC do modelo 4 foi superior à do modelo 1 em `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)` (DeLong, emparelhado).
+Na validação cruzada, a AUC do modelo completo foi superior à do modelo reduzido em `r num_ic(dif_auc, dif_inf, dif_sup)`, com p = `r num_p(dif_p)` (DeLong, emparelhado).
 
 ### Calibração
 
 ```{r}
-#| label: calibracao
-# Previsões da validação cruzada: nos dados de ajuste, a calibração é perfeita
-# por construção.
-dados_cv1 <- data.frame(y = dataset$y, p = pcv1)
-dados_cv4 <- data.frame(y = dataset$y, p = pcv4)
-
 cal1 <- calibracao(dados_cv1)
 cal4 <- calibracao(dados_cv4)
-
-res_cal1 <- resumo_calibracao(dados_cv1)
-res_cal4 <- resumo_calibracao(dados_cv4)
 ```
 
 A @tbl-calibracao resume a calibração dos dois modelos e a @fig-calibracao mostra-a por decis.
@@ -534,8 +511,8 @@ A @tbl-calibracao resume a calibração dos dois modelos e a @fig-calibracao mos
 #| label: tbl-calibracao
 #| tbl-cap: "Calibração na validação cruzada. CITL: calibração global (ideal = 0); declive de calibração (ideal = 1)."
 bind_rows(
-  res_cal1 |> mutate(Modelo = "Modelo 1"),
-  res_cal4 |> mutate(Modelo = "Modelo 4")
+  res_cal1 |> mutate(Modelo = "Modelo reduzido"),
+  res_cal4 |> mutate(Modelo = "Modelo completo")
 ) |>
   transmute(
     Modelo,
@@ -547,14 +524,14 @@ bind_rows(
   knitr::kable()
 ```
 
-A calibração global foi boa nos dois modelos: a CITL foi `r num_ic(res_cal1$citl, res_cal1$citl_inf, res_cal1$citl_sup)` no modelo 1 e `r num_ic(res_cal4$citl, res_cal4$citl_inf, res_cal4$citl_sup)` no modelo 4. O declive de calibração foi `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo 1 e `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo 4.
+A calibração global foi boa nos dois modelos: a CITL foi `r num_ic(res_cal1$citl, res_cal1$citl_inf, res_cal1$citl_sup)` no modelo reduzido e `r num_ic(res_cal4$citl, res_cal4$citl_inf, res_cal4$citl_sup)` no modelo completo. O declive de calibração foi `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup)` no modelo reduzido e `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup)` no modelo completo.
 
 ```{r}
 #| label: fig-calibracao
 #| fig-cap: "Calibração na validação cruzada. Cada ponto é um decil de probabilidade prevista (cerca de 30 doentes); a diagonal tracejada é a calibração perfeita."
 #| fig-subcap:
-#|   - "Modelo 1"
-#|   - "Modelo 4"
+#|   - "Modelo reduzido"
+#|   - "Modelo completo"
 #| layout-ncol: 2
 #| fig-width: 4
 #| fig-height: 4
@@ -571,131 +548,6 @@ grafico_calibracao(cal1)
 grafico_calibracao(cal4)
 ```
 
-### Análise de sensibilidade
-
-```{r}
-#| label: sensibilidade
-# Os modelos diferem dos principais apenas pela forma funcional da creatinina.
-f1_linear <- y ~ serum_creatinine + ejection_fraction
-f4_linear <- y ~ serum_creatinine + ejection_fraction + age + serum_sodium +
-  anaemia + high_blood_pressure + diabetes + sex + smoking +
-  creatinine_phosphokinase + platelets
-
-pcv1_linear <- numeric(nrow(dataset))
-pcv4_linear <- numeric(nrow(dataset))
-
-for (k in 1:10) {
-  treino <- dataset |> filter(parte != k)
-  teste  <- dataset |> filter(parte == k)
-
-  pcv1_linear[dataset$parte == k] <- ajustar(f1_linear, treino, teste)
-  pcv4_linear[dataset$parte == k] <- ajustar(f4_linear, treino, teste)
-}
-
-roc_cv1_linear <- roc(dataset$y, pcv1_linear, quiet = TRUE)
-roc_cv4_linear <- roc(dataset$y, pcv4_linear, quiet = TRUE)
-ci_cv1_linear  <- ci.auc(roc_cv1_linear)
-ci_cv4_linear  <- ci.auc(roc_cv4_linear)
-
-comp_linear <- roc.test(
-  roc_cv1_linear, roc_cv4_linear, paired = TRUE, method = "delong"
-)
-dif_auc_linear <- auc(roc_cv4_linear) - auc(roc_cv1_linear)
-dif_inf_linear <- -comp_linear$conf.int[2]
-dif_sup_linear <- -comp_linear$conf.int[1]
-
-dados_cv1_linear <- data.frame(y = dataset$y, p = pcv1_linear)
-dados_cv4_linear <- data.frame(y = dataset$y, p = pcv4_linear)
-res_cal1_linear <- resumo_calibracao(dados_cv1_linear)
-res_cal4_linear <- resumo_calibracao(dados_cv4_linear)
-cal1_linear <- calibracao(dados_cv1_linear)
-cal4_linear <- calibracao(dados_cv4_linear)
-```
-
-```{r}
-#| label: tbl-sensibilidade
-#| tbl-cap: "Desempenho na validação cruzada, com a creatinina em logaritmo ou linear."
-bind_rows(
-  tibble(
-    Análise = "Principal (log)",
-    Modelo = c("1", "4"),
-    auc = c(auc(roc_cv1), auc(roc_cv4)),
-    auc_inf = c(ci_cv1[1], ci_cv4[1]),
-    auc_sup = c(ci_cv1[3], ci_cv4[3]),
-    citl = c(res_cal1$citl, res_cal4$citl),
-    citl_inf = c(res_cal1$citl_inf, res_cal4$citl_inf),
-    citl_sup = c(res_cal1$citl_sup, res_cal4$citl_sup),
-    declive = c(res_cal1$declive, res_cal4$declive),
-    declive_inf = c(res_cal1$declive_inf, res_cal4$declive_inf),
-    declive_sup = c(res_cal1$declive_sup, res_cal4$declive_sup)
-  ),
-  tibble(
-    Análise = "Sensibilidade (linear)",
-    Modelo = c("1", "4"),
-    auc = c(auc(roc_cv1_linear), auc(roc_cv4_linear)),
-    auc_inf = c(ci_cv1_linear[1], ci_cv4_linear[1]),
-    auc_sup = c(ci_cv1_linear[3], ci_cv4_linear[3]),
-    citl = c(res_cal1_linear$citl, res_cal4_linear$citl),
-    citl_inf = c(res_cal1_linear$citl_inf, res_cal4_linear$citl_inf),
-    citl_sup = c(res_cal1_linear$citl_sup, res_cal4_linear$citl_sup),
-    declive = c(res_cal1_linear$declive, res_cal4_linear$declive),
-    declive_inf = c(res_cal1_linear$declive_inf, res_cal4_linear$declive_inf),
-    declive_sup = c(res_cal1_linear$declive_sup, res_cal4_linear$declive_sup)
-  )
-) |>
-  transmute(
-    Análise,
-    Modelo,
-    `AUC validada (IC 95 %)` = paste0(num(auc), " (", num(auc_inf), "–", num(auc_sup), ")"),
-    `CITL (IC 95 %)` = paste0(num(citl), " (", num(citl_inf), " a ", num(citl_sup), ")"),
-    `Declive (IC 95 %)` = paste0(num(declive), " (", num(declive_inf), " a ", num(declive_sup), ")")
-  ) |>
-  knitr::kable()
-```
-
-```{r}
-#| label: tbl-diferenca-sensibilidade
-#| tbl-cap: "Diferença de AUC validada (modelo 4 − modelo 1) na análise principal e na análise de sensibilidade."
-tibble(
-  Análise = c("Principal (log)", "Sensibilidade (linear)"),
-  diferença = c(dif_auc, dif_auc_linear),
-  inferior = c(dif_inf, dif_inf_linear),
-  superior = c(dif_sup, dif_sup_linear),
-  p = c(dif_p, comp_linear$p.value)
-) |>
-  transmute(
-    Análise,
-    `Diferença de AUC (IC 95 %)` = paste0(num(diferença), " (", num(inferior), " a ", num(superior), ")"),
-    `p` = num_p(p)
-  ) |>
-  knitr::kable()
-```
-
-Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi `r num_ic(dif_auc, dif_inf, dif_sup)`. Com a creatinina linear, foi `r num_ic(dif_auc_linear, dif_inf_linear, dif_sup_linear)` (p = `r num_p(comp_linear$p.value)`). A tabela apresenta também a calibração de cada modelo nas duas especificações; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.
-
-```{r}
-#| label: fig-sensibilidade-roc
-#| fig-cap: "Curvas ROC na validação cruzada da análise de sensibilidade (creatinina linear)."
-grafico_roc(setNames(
-  list(roc_cv1_linear, roc_cv4_linear),
-  c(legenda_auc("Modelo 1", roc_cv1_linear),
-    legenda_auc("Modelo 4", roc_cv4_linear))
-))
-```
-
-```{r}
-#| label: fig-sensibilidade-calibracao
-#| fig-cap: "Calibração na validação cruzada da análise de sensibilidade (creatinina linear)."
-#| fig-subcap:
-#|   - "Modelo 1"
-#|   - "Modelo 4"
-#| layout-ncol: 2
-#| fig-width: 4
-#| fig-height: 4
-grafico_calibracao(cal1_linear)
-grafico_calibracao(cal4_linear)
-```
-
 ## Discussão
 
 O resultado principal numa frase. Como se compara com o que se sabia. As limitações do desenho e dos dados, com o efeito provável de cada uma sobre o resultado. O que se faria a seguir.
@@ -706,7 +558,7 @@ A base de dados não inclui os tratamentos recebidos, pelo que estes não foram 
 
 ### Transportabilidade
 
-Na prática, o modelo 1 usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.
+Na prática, o modelo reduzido usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.
 
 ## Declaração de uso de inteligência artificial
 
@@ -774,8 +626,8 @@ tidy(glm(f4, family = binomial, data = dataset)) |>
   ) |>
   transmute(
     Variável     = unname(rotulos[term]),
-    `β modelo 1` = if_else(is.na(beta1), "—", num_beta(beta1)),
-    `β modelo 4` = num_beta(beta4)
+    `β modelo reduzido` = if_else(is.na(beta1), "—", num_beta(beta1)),
+    `β modelo completo` = num_beta(beta4)
   ) |>
   knitr::kable()
 ```
@@ -804,7 +656,7 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 | 8a | D;E | Definição do desfecho, horizonte temporal e momento de avaliação | Métodos – Dados |
 | 8b | D;E | Qualificações de quem avalia o desfecho, se subjetivo | Não aplicável (morte é objetiva) |
 | 8c | D;E | Ocultação na avaliação do desfecho | Não aplicável (dados retrospetivos públicos) |
-| 9a | D | Escolha inicial dos preditores e pré-seleção | Métodos – Variáveis (modelo 1 de Chicco e Jurman; modelo 4 com todas) |
+| 9a | D | Escolha inicial dos preditores e pré-seleção | Métodos – Variáveis (modelo reduzido de Chicco e Jurman; modelo completo com todas) |
 | 9b | D;E | Definição, momento e forma de medição dos preditores | Métodos – Variáveis; Dados (`time` excluído) |
 | 9c | D;E | Qualificações de quem avalia os preditores, se subjetivos | Não aplicável (medições objetivas) |
 | 10 | D;E | Como foi definido o tamanho amostral e porque é suficiente | Métodos – Variáveis (mortes por parâmetro) |
@@ -834,7 +686,7 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 | 20a | D;E | Fluxo de participantes, n com e sem desfecho, seguimento | Resultados – Caracterização da amostra |
 | 20b | D;E | Características dos participantes | Resultados – Tabela 1 |
 | 20c | E | Comparação com os dados de desenvolvimento | Não aplicável |
-| 21 | D;E | N de participantes e eventos em cada análise | Resultados – Caracterização; Análise de sensibilidade (mesmos participantes) |
+| 21 | D;E | N de participantes e eventos em cada análise | Resultados – Caracterização |
 | 22 | D | Modelo completo, para outros o poderem aplicar | Anexo A – Coeficientes |
 | 23a | D;E | Desempenho com IC, incluindo subgrupos | Resultados – Discriminação, Comparação principal, Calibração |
 | 23b | D;E | Heterogeneidade do desempenho entre centros | Não aplicável |
