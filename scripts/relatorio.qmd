@@ -236,7 +236,7 @@ A questão de avaliação, em formato PICO, foi a seguinte: Em doentes com insuf
 
 ### Dados
 
-Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a *Heart Failure Clinical Records*, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).
+Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a *Heart Failure Clinical Records*, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne `r nrow(dataset)` doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). O desenho é observacional: uma coorte retrospetiva de dois hospitais, de que fizemos uma análise secundária. Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).
 
 Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (3). O seguimento variou entre `r min(dataset$time)` e `r max(dataset$time)` dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram `r sum(dataset$y)` doentes, ou seja, `r num(100 * mean(dataset$y), 1)` % da amostra.
 
@@ -296,6 +296,8 @@ Os dados incluem `r nrow(dataset)` doentes, dos quais `r sum(dataset$y)` (`r num
 # O fator com rótulos é criado só dentro deste pipe, para não alterar o y
 # numérico. O time fica de fora: é o tempo de seguimento, não uma
 # característica do doente.
+# Sexo: a codificação 1 = masculino foi inferida por contagem (há 194 doentes
+# com sex = 1, tantos como os homens descritos por Ahmad et al., 2017).
 dataset |>
   mutate(y = factor(y, levels = c(0, 1), labels = c("Sobreviveu", "Morreu"))) |>
   select(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,
@@ -685,7 +687,7 @@ tibble(
   knitr::kable()
 ```
 
-Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi `r num_ic(dif_auc, dif_inf, dif_sup)`. Com a creatinina linear, foi `r num_ic(dif_auc_linear, dif_inf_linear, dif_sup_linear)` (p = `r num_p(comp_linear$p.value)`). A tabela apresenta também a calibração de cada modelo nas duas especificações; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.
+A @tbl-sensibilidade e a @tbl-diferenca-sensibilidade comparam a análise principal com a análise de sensibilidade. Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi `r num_ic(dif_auc, dif_inf, dif_sup)`. Com a creatinina linear, foi `r num_ic(dif_auc_linear, dif_inf_linear, dif_sup_linear)` (p = `r num_p(comp_linear$p.value)`): a diferença entre os modelos manteve-se pequena e o IC continuou a incluir 0 (@fig-sensibilidade-roc). A @tbl-sensibilidade apresenta também a calibração de cada modelo nas duas especificações (@fig-sensibilidade-calibracao). A forma da creatinina não alterou, portanto, a conclusão; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.
 
 ```{r}
 #| label: fig-sensibilidade-roc
@@ -712,33 +714,50 @@ grafico_calibracao(cal4_linear)
 
 ## Discussão
 
-O resultado principal numa frase. Como se compara com o que se sabia. As limitações do desenho e dos dados, com o efeito provável de cada uma sobre o resultado. O que se faria a seguir.
+Depois de corrigido o otimismo, o modelo com creatinina sérica e fração de ejeção discriminou quase tão bem como o modelo com as 11 variáveis clínicas: a diferença de AUC validada foi de `r num_ic(dif_auc, dif_inf, dif_sup)` a favor do modelo completo (@fig-roc-2). O IC é compatível com a ausência de diferença, mas também com uma vantagem do modelo 4 de até `r num(dif_sup)`, pelo que os dados não demonstram que os dois modelos são equivalentes. Nas análises secundárias, o modelo 4 teve mais otimismo e um declive de calibração mais afastado de 1 (`r num(res_cal4$declive, 2)` contra `r num(res_cal1$declive, 2)`), como se espera com `r num(epp_4, 1)` mortes por parâmetro, embora os IC dos dois declives se sobreponham.
+
+Em termos clínicos, a diferença estimada significa que, em cada 100 pares formados por um doente que morreu e outro que sobreviveu, o modelo completo atribui o risco mais alto ao doente que morreu em mais `r num(100 * dif_auc, 0)` pares do que o modelo de duas variáveis; no limite superior do IC, seriam mais `r num(100 * dif_sup, 0)`. É um ganho pequeno para um modelo que exige mais nove variáveis e mostra mais sinais de sobreajustamento. Como não fixámos um limiar de decisão, não sabemos se esta diferença alteraria decisões clínicas.
+
+Chicco e Jurman (4) concluíram que estas duas variáveis, sozinhas, davam previsões mais exatas do que todas as variáveis juntas, com base sobretudo no coeficiente de correlação de Matthews, uma métrica de classificação. Os nossos resultados são compatíveis com um modelo simples quase tão bom como o completo, mas não mostram que seja melhor, e acrescentam a calibração e a incerteza das estimativas. Com todas as variáveis, o melhor classificador desses autores teve uma AUC de 0,800, e o modelo de Cox de Ahmad et al. (3), validado por *bootstrap*, teve AUC de 0,81 aos 250 dias e de 0,77 aos 50 dias e declive de calibração de 0,96: valores da mesma ordem dos do nosso modelo 4 (AUC validada de `r num(auc(roc_cv4))`).
 
 ### Limitações
 
-A base de dados não inclui os tratamentos recebidos, pelo que estes não foram considerados nos modelos. Também não identifica o hospital de cada doente, o que impediu avaliar a heterogeneidade entre centros. A equidade dos modelos não foi avaliada: `r num(100 * mean(dataset$sex), 1)` % dos doentes são homens e todos provêm de uma só população.
+- **Seguimento variável.** O seguimento durou entre `r min(dataset$time)` e `r max(dataset$time)` dias e a morte foi tratada como desfecho binário: quem foi seguido poucos dias conta como sobrevivente, mesmo que tenha morrido depois. Este erro de classificação reduz provavelmente a discriminação dos dois modelos de forma semelhante e deve afetar pouco a diferença entre eles, mas as probabilidades previstas não correspondem a um prazo fixo, o que limita a interpretação do risco absoluto.
+- **Dois hospitais e um ano.** Os doentes vêm de dois hospitais da mesma cidade, internados entre abril e dezembro de 2015, e a base não identifica o hospital de cada um, o que impediu avaliar a heterogeneidade entre centros. Noutra população, é provável que a discriminação seja mais baixa e que a calibração se altere, e a diferença entre os modelos pode não ser a mesma.
+- **Confundimento não medido.** A base não regista os tratamentos recebidos, a classe da NYHA de cada doente nem biomarcadores como os péptidos natriuréticos. Os coeficientes não têm interpretação causal, e um modelo que incluísse estes preditores poderia superar o modelo 1 por uma margem maior do que a observada.
+- **Poucas mortes.** Com `r n_mortes` mortes, os IC são largos: a amostra não distingue a ausência de diferença de uma vantagem de `r num(dif_sup)` na AUC. É esta imprecisão que impede concluir pela equivalência.
+- **Escolhas feitas nos mesmos dados.** As duas variáveis do modelo 1 foram selecionadas por Chicco e Jurman (4) nestes mesmos doentes, e esse otimismo não foi corrigido: em doentes novos, a vantagem do modelo completo pode ser maior do que a estimada. A forma da creatinina também foi escolhida com todos os dados, mas a análise de sensibilidade sugere que pesou pouco.
+- **Equidade.** Não avaliámos o desempenho por subgrupos: `r num(100 * mean(dataset$sex), 1)` % dos doentes são homens e todos provêm de uma só população. Não sabemos se a conclusão se mantém nas mulheres ou noutros grupos.
 
 ### Transportabilidade
 
-Na prática, o modelo 1 usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.
+A conclusão só se pode transportar para doentes semelhantes aos da coorte: adultos com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo, em classe III ou IV da NYHA. Não se aplica, sem nova avaliação, a doentes com fração de ejeção preservada, seguidos em ambulatório ou de outros sistemas de saúde, como o português.
+
+Sem dados de outro hospital, não houve validação externa. Para usar o modelo 1 noutro contexto, faltaria validá-lo numa amostra local com um prazo de previsão fixo, recalibrá-lo para a mortalidade desse hospital e confirmar que a creatinina e a fração de ejeção são medidas da mesma forma. Na prática, o modelo usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção); não foi pensado para dados em falta e não deve ser aplicado sem um destes valores. Os utilizadores previstos são os médicos que acompanham estes doentes no internamento, que precisam de saber interpretar uma probabilidade e a sua incerteza; a previsão não substitui o juízo clínico.
+
+### Próximos passos
+
+O passo seguinte seria a validação externa numa coorte independente, com o mesmo tempo de seguimento para todos os doentes ou com um modelo de sobrevivência, que usa o tempo até à morte. Uma amostra com mais mortes permitiria testar a equivalência dos dois modelos com uma margem definida antes da análise. Faltaria ainda avaliar a utilidade clínica, com limiares de decisão, e o desempenho por sexo e por idade.
+
+### Conclusão
+
+Nesta coorte, um modelo com creatinina sérica e fração de ejeção previu a morte durante o seguimento com discriminação próxima da de um modelo com 11 variáveis e sem sinais de pior calibração. A incerteza não permite afirmar que os dois são equivalentes, e o resultado, de validação interna numa só população, justifica uma validação externa, não o uso clínico do modelo.
 
 ## Declaração de uso de inteligência artificial
 
-Declaramos que na elaboração deste trabalho foi utilizada a seguinte ferramenta de inteligência artificial generativa:
+Declaramos que na elaboração deste trabalho foram utilizadas ferramentas de inteligência artificial generativa:
 
-- Ferramenta: [nome e versão]
-- Tipo de assistência: [indicar]
-- Nível HEAT-AI do uso: [mínimo / limitado / alto]
-- Secções em que foi aplicada: [indicar]
-- Prompts utilizados: [lista resumida; os prompts completos, se forem longos, num anexo no fim do relatório]
-- Verificações humanas efetuadas: [indicar]
-- Período de utilização: [de dd/mm a dd/mm]
+- Ferramenta: Claude (Anthropic); na sessão de 20/11, o modelo Claude Fable 5.2, através do Claude Code. **[PREENCHER: modelo e versão usados nas outras sessões, incluindo o assistente «professor-mais»]**
+- Tipo de assistência: apoio à escrita de código R; apoio à organização do projeto (Git, GitHub, guia, README e lista de tarefas); primeira versão do texto da Discussão; verificação das referências e da renderização do relatório.
+- Nível HEAT-AI do uso: **[PREENCHER: mínimo / limitado / alto]**
+- Secções em que foi aplicada: Métodos e Resultados (código); Discussão (primeira versão do texto); esta declaração e o Anexo D.
+- Prompts utilizados: lista resumida, por elemento do grupo, no [Anexo D](#anexo-ia).
+- Verificações humanas efetuadas: **[PREENCHER: código testado; resultados refeitos; fontes confirmadas no original; controlo de privacidade]** O que o grupo corrigiu ou rejeitou nas respostas dos modelos está no Anexo D.
+- Período de utilização: **[PREENCHER: de dd/mm]** a 20/11.
 
 O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pela ferramenta. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
 
-Se não foi usada IA: "Declaramos que não foi utilizada nenhuma ferramenta de inteligência artificial generativa na elaboração deste trabalho."
-
-Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0); a declaração pode ser gerada no Themis (https://tiagojacinto.eu/fmup-ia/themis/).
+Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0).
 
 ## Referências
 
@@ -805,7 +824,7 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 | 2 | D;E | Resumo segundo a TRIPOD+AI para resumos | Resumo |
 | **Introdução** | | | |
 | 3a | D;E | Contexto clínico e racional, com referência a modelos existentes | Introdução (§1–2) |
-| 3b | D;E | População-alvo, finalidade no percurso de cuidados e utilizadores previstos | Introdução (§1) |
+| 3b | D;E | População-alvo, finalidade no percurso de cuidados e utilizadores previstos | Introdução (§1); Discussão – Transportabilidade |
 | 3c | D;E | Desigualdades de saúde conhecidas entre grupos sociodemográficos | Discussão – Limitações |
 | 4 | D;E | Objetivos, incluindo se o estudo desenvolve, avalia ou ambos | Introdução (§3–4, objetivo e PICO) |
 | **Métodos** | | | |
@@ -854,7 +873,7 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 | 23b | D;E | Heterogeneidade do desempenho entre centros | Não aplicável |
 | 24 | E | Resultados de atualização do modelo | Não aplicável |
 | **Discussão** | | | |
-| 25 | D;E | Interpretação geral, incluindo equidade e estudos anteriores | Discussão (§1–3) |
+| 25 | D;E | Interpretação geral, incluindo equidade e estudos anteriores | Discussão (§1–3); Limitações (equidade); Conclusão |
 | 26 | D;E | Limitações e efeito sobre viés, incerteza e generalização | Discussão – Limitações |
 | 27a | D | Como lidar com dados em falta ou de má qualidade na prática | Discussão – Transportabilidade |
 | 27b | D | Interação dos utilizadores com o modelo e competências exigidas | Discussão – Transportabilidade |
@@ -869,3 +888,27 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 # ambiente de execução.
 sessionInfo()
 ```
+
+## Anexo D: registo do uso de inteligência artificial {#anexo-ia}
+
+### Prompts utilizados
+
+| Elemento | Ferramenta e data | Para quê | Prompts |
+|--|---|------|------|
+| Joaquim Santos | Claude Fable 5.2 (Claude Code), 20/11 | Juntar as alterações ainda por aprovar e confirmar que o relatório renderiza numa pasta limpa; escrever a primeira versão da Discussão, a partir dos resultados e da lista de tarefas do grupo; acrescentar o desenho do estudo aos Métodos e as referências cruzadas à análise de sensibilidade; confirmar as referências; preparar esta declaração | «quero que continues o trabalho. Em que parte vamos, o que falta fazer?»; «quero 2 coisas. 1, que coloques aqui o ficheiro completo do que já foi escrito. 2, que faças o que falta fazer»; «mas deves fazer o que falta num branch à parte»; «o resumo não o faças. Continua» |
+| Isabelle Araújo | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
+| João Santos | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
+| Raquel Bragança | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
+
+### Texto e código produzidos por IA
+
+- Funções `logit_por_decil()`, `teste_forma()`, `ajustar()`, `calibracao()` e `resumo_calibracao()`; histogramas; código da AUC aparente, da validação cruzada, da comparação principal e da calibração; comentários sobre a distribuição das variáveis e a linearidade no logit.
+- Guia de Git, README e lista de tarefas do projeto.
+- Primeira versão da Discussão (20/11). **[PREENCHER: o que o grupo alterou depois de a rever]**
+
+### O que o grupo corrigiu ou rejeitou
+
+- 16/11: rejeitámos um ramo (*branch*) proposto; questionámos a Tabela 1 e os histogramas.
+- 17/11: questionámos a *spline* e simplificámos o critério do AIC; testámos a forma só das variáveis assimétricas; rejeitámos uma análise de sensibilidade a 90 dias; propusemos usar os modelos 2 e 3 como análise de sensibilidade.
+- 20/11: não aceitámos o Resumo que a ferramenta tinha começado a escrever; essa versão foi retirada.
+- **[PREENCHER: o porquê de cada decisão]**

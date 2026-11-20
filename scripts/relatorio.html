@@ -2366,6 +2366,7 @@ window.Quarto = {
   <li><a href="#anexo-a-coeficientes-dos-modelos" id="toc-anexo-a-coeficientes-dos-modelos" class="nav-link" data-scroll-target="#anexo-a-coeficientes-dos-modelos">Anexo A: coeficientes dos modelos</a></li>
   <li><a href="#anexo-tripod" id="toc-anexo-tripod" class="nav-link" data-scroll-target="#anexo-tripod">Anexo B: lista de verificação TRIPOD+AI</a></li>
   <li><a href="#anexo-c-ambiente-de-execução" id="toc-anexo-c-ambiente-de-execução" class="nav-link" data-scroll-target="#anexo-c-ambiente-de-execução">Anexo C: ambiente de execução</a></li>
+  <li><a href="#anexo-ia" id="toc-anexo-ia" class="nav-link" data-scroll-target="#anexo-ia">Anexo D: registo do uso de inteligência artificial</a></li>
   </ul>
 </nav>
 </div>
@@ -2427,7 +2428,7 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="métodos">Métodos</h2>
 <section id="dados" class="level3">
 <h3 class="anchored" data-anchor-id="dados">Dados</h3>
-<p>Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a <em>Heart Failure Clinical Records</em>, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne 299 doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).</p>
+<p>Foi usada uma base de dados selecionada pelo regente da Unidade Curricular de Metodologia de Avaliação em Informática da Saúde: a <em>Heart Failure Clinical Records</em>, uma base pública disponível no repositório UCI (licença CC BY 4.0). Reúne 299 doentes internados em dois hospitais em Faisalabad, no Paquistão, entre abril e dezembro de 2015 (3). O desenho é observacional: uma coorte retrospetiva de dois hospitais, de que fizemos uma análise secundária. Cada linha corresponde a um doente. O ficheiro foi usado sem alterações e não tem valores em falta nem linhas duplicadas. O estudo original foi aprovado pelo Institutional Review Board da Government College University, em Faisalabad, seguiu os princípios da Declaração de Helsínquia e obteve o consentimento informado dos doentes (3).</p>
 <p>Segundo a fonte, foram incluídos doentes com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo e classe III ou IV da NYHA (3). O seguimento variou entre 4 e 285 dias, e o desfecho do estudo foi a morte durante o seguimento (DEATH_EVENT). Morreram 96 doentes, ou seja, 32,1 % da amostra.</p>
 <p>O tempo de seguimento (<code>time</code>) foi excluído dos modelos, porque só se conhece no fim do seguimento e depende do próprio desfecho: quem morre tem um seguimento mais curto. Usá-lo como preditor seria <em>data leakage</em>.</p>
 </section>
@@ -2463,32 +2464,34 @@ window.Quarto = {
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># O fator com rótulos é criado só dentro deste pipe, para não alterar o y</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># numérico. O time fica de fora: é o tempo de seguimento, não uma</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># característica do doente.</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>dataset <span class="sc">|&gt;</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">y =</span> <span class="fu">factor</span>(y, <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>), <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Sobreviveu&quot;</span>, <span class="st">&quot;Morreu&quot;</span>))) <span class="sc">|&gt;</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>         ejection_fraction, serum_creatinine, serum_sodium,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>         creatinine_phosphokinase, platelets) <span class="sc">|&gt;</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tbl_summary</span>(</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> y,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="st">&quot;{median} [{p25}–{p75}]&quot;</span>),</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(serum_sodium <span class="sc">~</span> <span class="dv">0</span>),</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">label =</span> <span class="fu">list</span>(</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>      age                      <span class="sc">~</span> <span class="st">&quot;Idade, anos&quot;</span>,</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>      sex                      <span class="sc">~</span> <span class="st">&quot;Sexo masculino&quot;</span>,</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>      smoking                  <span class="sc">~</span> <span class="st">&quot;Fumador&quot;</span>,</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>      anaemia                  <span class="sc">~</span> <span class="st">&quot;Anemia&quot;</span>,</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>      diabetes                 <span class="sc">~</span> <span class="st">&quot;Diabetes&quot;</span>,</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>      high_blood_pressure      <span class="sc">~</span> <span class="st">&quot;Hipertensão arterial&quot;</span>,</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>      ejection_fraction        <span class="sc">~</span> <span class="st">&quot;Fração de ejeção, %&quot;</span>,</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>      serum_creatinine         <span class="sc">~</span> <span class="st">&quot;Creatinina sérica, mg/dL&quot;</span>,</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>      serum_sodium             <span class="sc">~</span> <span class="st">&quot;Sódio sérico, mEq/L&quot;</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>      creatinine_phosphokinase <span class="sc">~</span> <span class="st">&quot;Creatina fosfoquinase (CPK), mcg/L&quot;</span>,</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>      platelets                <span class="sc">~</span> <span class="st">&quot;Plaquetas, kiloplaquetas/mL&quot;</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">missing_text =</span> <span class="st">&quot;Em falta&quot;</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_overall</span>(<span class="at">col_label =</span> <span class="st">&quot;**Total**  </span><span class="sc">\n</span><span class="st">N = {N}&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bold_labels</span>()</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Sexo: a codificação 1 = masculino foi inferida por contagem (há 194 doentes</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># com sex = 1, tantos como os homens descritos por Ahmad et al., 2017).</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>dataset <span class="sc">|&gt;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">y =</span> <span class="fu">factor</span>(y, <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>), <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Sobreviveu&quot;</span>, <span class="st">&quot;Morreu&quot;</span>))) <span class="sc">|&gt;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>         ejection_fraction, serum_creatinine, serum_sodium,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>         creatinine_phosphokinase, platelets) <span class="sc">|&gt;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tbl_summary</span>(</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> y,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">statistic =</span> <span class="fu">list</span>(<span class="fu">all_continuous</span>() <span class="sc">~</span> <span class="st">&quot;{median} [{p25}–{p75}]&quot;</span>),</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">digits =</span> <span class="fu">list</span>(serum_sodium <span class="sc">~</span> <span class="dv">0</span>),</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">label =</span> <span class="fu">list</span>(</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>      age                      <span class="sc">~</span> <span class="st">&quot;Idade, anos&quot;</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>      sex                      <span class="sc">~</span> <span class="st">&quot;Sexo masculino&quot;</span>,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>      smoking                  <span class="sc">~</span> <span class="st">&quot;Fumador&quot;</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>      anaemia                  <span class="sc">~</span> <span class="st">&quot;Anemia&quot;</span>,</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>      diabetes                 <span class="sc">~</span> <span class="st">&quot;Diabetes&quot;</span>,</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>      high_blood_pressure      <span class="sc">~</span> <span class="st">&quot;Hipertensão arterial&quot;</span>,</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>      ejection_fraction        <span class="sc">~</span> <span class="st">&quot;Fração de ejeção, %&quot;</span>,</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>      serum_creatinine         <span class="sc">~</span> <span class="st">&quot;Creatinina sérica, mg/dL&quot;</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>      serum_sodium             <span class="sc">~</span> <span class="st">&quot;Sódio sérico, mEq/L&quot;</span>,</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>      creatinine_phosphokinase <span class="sc">~</span> <span class="st">&quot;Creatina fosfoquinase (CPK), mcg/L&quot;</span>,</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>      platelets                <span class="sc">~</span> <span class="st">&quot;Plaquetas, kiloplaquetas/mL&quot;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">missing_text =</span> <span class="st">&quot;Em falta&quot;</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_overall</span>(<span class="at">col_label =</span> <span class="st">&quot;**Total**  </span><span class="sc">\n</span><span class="st">N = {N}&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bold_labels</span>()</span></code></pre></div><button title="Copiar para a área de transferência" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div id="tbl-caracterizacao" class="cell quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-tbl figure">
@@ -2497,20 +2500,20 @@ Tabela 1: Características dos doentes por desfecho. Contínuas em mediana [IIQ
 </figcaption>
 <div aria-describedby="tbl-caracterizacao-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="cell-output-display">
-<div id="yuefwfdlxi" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#yuefwfdlxi table {
+<div id="jxptmjnohl" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#jxptmjnohl table {
 font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#yuefwfdlxi thead, #yuefwfdlxi tbody, #yuefwfdlxi tfoot, #yuefwfdlxi tr, #yuefwfdlxi td, #yuefwfdlxi th {
+#jxptmjnohl thead, #jxptmjnohl tbody, #jxptmjnohl tfoot, #jxptmjnohl tr, #jxptmjnohl td, #jxptmjnohl th {
 border-style: none;
 }
-#yuefwfdlxi p {
+#jxptmjnohl p {
 margin: 0;
 padding: 0;
 }
-#yuefwfdlxi .gt_table {
+#jxptmjnohl .gt_table {
 display: table;
 border-collapse: collapse;
 line-height: normal;
@@ -2535,11 +2538,11 @@ border-left-style: none;
 border-left-width: 2px;
 border-left-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_caption {
+#jxptmjnohl .gt_caption {
 padding-top: 4px;
 padding-bottom: 4px;
 }
-#yuefwfdlxi .gt_title {
+#jxptmjnohl .gt_title {
 color: #333333;
 font-size: 125%;
 font-weight: initial;
@@ -2550,7 +2553,7 @@ padding-right: 5px;
 border-bottom-color: #FFFFFF;
 border-bottom-width: 0;
 }
-#yuefwfdlxi .gt_subtitle {
+#jxptmjnohl .gt_subtitle {
 color: #333333;
 font-size: 85%;
 font-weight: initial;
@@ -2561,7 +2564,7 @@ padding-right: 5px;
 border-top-color: #FFFFFF;
 border-top-width: 0;
 }
-#yuefwfdlxi .gt_heading {
+#jxptmjnohl .gt_heading {
 background-color: #FFFFFF;
 text-align: center;
 border-bottom-color: #FFFFFF;
@@ -2572,12 +2575,12 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_bottom_border {
+#jxptmjnohl .gt_bottom_border {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_col_headings {
+#jxptmjnohl .gt_col_headings {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -2591,7 +2594,7 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_col_heading {
+#jxptmjnohl .gt_col_heading {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2610,7 +2613,7 @@ padding-left: 5px;
 padding-right: 5px;
 overflow-x: hidden;
 }
-#yuefwfdlxi .gt_column_spanner_outer {
+#jxptmjnohl .gt_column_spanner_outer {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2621,13 +2624,13 @@ padding-bottom: 0;
 padding-left: 4px;
 padding-right: 4px;
 }
-#yuefwfdlxi .gt_column_spanner_outer:first-child {
+#jxptmjnohl .gt_column_spanner_outer:first-child {
 padding-left: 0;
 }
-#yuefwfdlxi .gt_column_spanner_outer:last-child {
+#jxptmjnohl .gt_column_spanner_outer:last-child {
 padding-right: 0;
 }
-#yuefwfdlxi .gt_column_spanner {
+#jxptmjnohl .gt_column_spanner {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
@@ -2638,10 +2641,10 @@ overflow-x: hidden;
 display: inline-block;
 width: 100%;
 }
-#yuefwfdlxi .gt_spanner_row {
+#jxptmjnohl .gt_spanner_row {
 border-bottom-style: hidden;
 }
-#yuefwfdlxi .gt_group_heading {
+#jxptmjnohl .gt_group_heading {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2666,7 +2669,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 text-align: left;
 }
-#yuefwfdlxi .gt_empty_group_heading {
+#jxptmjnohl .gt_empty_group_heading {
 padding: 0.5px;
 color: #333333;
 background-color: #FFFFFF;
@@ -2680,13 +2683,13 @@ border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 vertical-align: middle;
 }
-#yuefwfdlxi .gt_from_md > :first-child {
+#jxptmjnohl .gt_from_md > :first-child {
 margin-top: 0;
 }
-#yuefwfdlxi .gt_from_md > :last-child {
+#jxptmjnohl .gt_from_md > :last-child {
 margin-bottom: 0;
 }
-#yuefwfdlxi .gt_row {
+#jxptmjnohl .gt_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2704,7 +2707,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 overflow-x: hidden;
 }
-#yuefwfdlxi .gt_stub {
+#jxptmjnohl .gt_stub {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2716,7 +2719,7 @@ border-right-color: #D3D3D3;
 padding-left: 5px;
 padding-right: 5px;
 }
-#yuefwfdlxi .gt_stub_row_group {
+#jxptmjnohl .gt_stub_row_group {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -2729,13 +2732,13 @@ padding-left: 5px;
 padding-right: 5px;
 vertical-align: top;
 }
-#yuefwfdlxi .gt_row_group_first td {
+#jxptmjnohl .gt_row_group_first td {
 border-top-width: 2px;
 }
-#yuefwfdlxi .gt_row_group_first th {
+#jxptmjnohl .gt_row_group_first th {
 border-top-width: 2px;
 }
-#yuefwfdlxi .gt_summary_row {
+#jxptmjnohl .gt_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -2744,14 +2747,14 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#yuefwfdlxi .gt_first_summary_row {
+#jxptmjnohl .gt_first_summary_row {
 border-top-style: solid;
 border-top-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_first_summary_row.thick {
+#jxptmjnohl .gt_first_summary_row.thick {
 border-top-width: 2px;
 }
-#yuefwfdlxi .gt_last_summary_row {
+#jxptmjnohl .gt_last_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2760,7 +2763,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_grand_summary_row {
+#jxptmjnohl .gt_grand_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -2769,7 +2772,7 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#yuefwfdlxi .gt_first_grand_summary_row {
+#jxptmjnohl .gt_first_grand_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2778,7 +2781,7 @@ border-top-style: double;
 border-top-width: 6px;
 border-top-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_last_grand_summary_row_top {
+#jxptmjnohl .gt_last_grand_summary_row_top {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -2787,10 +2790,10 @@ border-bottom-style: double;
 border-bottom-width: 6px;
 border-bottom-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_striped {
+#jxptmjnohl .gt_striped {
 background-color: rgba(128, 128, 128, 0.05);
 }
-#yuefwfdlxi .gt_table_body {
+#jxptmjnohl .gt_table_body {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -2798,7 +2801,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_footnotes {
+#jxptmjnohl .gt_footnotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -2811,7 +2814,7 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_footnote {
+#jxptmjnohl .gt_footnote {
 margin: 0px;
 font-size: 90%;
 padding-top: 4px;
@@ -2819,7 +2822,7 @@ padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#yuefwfdlxi .gt_sourcenotes {
+#jxptmjnohl .gt_sourcenotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -2832,64 +2835,64 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#yuefwfdlxi .gt_sourcenote {
+#jxptmjnohl .gt_sourcenote {
 font-size: 90%;
 padding-top: 4px;
 padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#yuefwfdlxi .gt_left {
+#jxptmjnohl .gt_left {
 text-align: left;
 }
-#yuefwfdlxi .gt_center {
+#jxptmjnohl .gt_center {
 text-align: center;
 }
-#yuefwfdlxi .gt_right {
+#jxptmjnohl .gt_right {
 text-align: right;
 font-variant-numeric: tabular-nums;
 }
-#yuefwfdlxi .gt_font_normal {
+#jxptmjnohl .gt_font_normal {
 font-weight: normal;
 }
-#yuefwfdlxi .gt_font_bold {
+#jxptmjnohl .gt_font_bold {
 font-weight: bold;
 }
-#yuefwfdlxi .gt_font_italic {
+#jxptmjnohl .gt_font_italic {
 font-style: italic;
 }
-#yuefwfdlxi .gt_super {
+#jxptmjnohl .gt_super {
 font-size: 65%;
 }
-#yuefwfdlxi .gt_footnote_marks {
+#jxptmjnohl .gt_footnote_marks {
 font-size: 75%;
 vertical-align: 0.4em;
 position: initial;
 }
-#yuefwfdlxi .gt_asterisk {
+#jxptmjnohl .gt_asterisk {
 font-size: 100%;
 vertical-align: 0;
 }
-#yuefwfdlxi .gt_indent_1 {
+#jxptmjnohl .gt_indent_1 {
 text-indent: 5px;
 }
-#yuefwfdlxi .gt_indent_2 {
+#jxptmjnohl .gt_indent_2 {
 text-indent: 10px;
 }
-#yuefwfdlxi .gt_indent_3 {
+#jxptmjnohl .gt_indent_3 {
 text-indent: 15px;
 }
-#yuefwfdlxi .gt_indent_4 {
+#jxptmjnohl .gt_indent_4 {
 text-indent: 20px;
 }
-#yuefwfdlxi .gt_indent_5 {
+#jxptmjnohl .gt_indent_5 {
 text-indent: 25px;
 }
-#yuefwfdlxi .katex-display {
+#jxptmjnohl .katex-display {
 display: inline-flex !important;
 margin-bottom: 0.75em !important;
 }
-#yuefwfdlxi div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#jxptmjnohl div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
 height: 0px !important;
 }
 </style>
@@ -3743,7 +3746,7 @@ Tabela 6: Diferença de AUC validada (modelo 4 − modelo 1) na análise princi
 </figure>
 </div>
 </div>
-<p>Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi 0,021 (IC 95 % −0,019 a 0,061). Com a creatinina linear, foi 0,024 (IC 95 % −0,020 a 0,068) (p = 0,291). A tabela apresenta também a calibração de cada modelo nas duas especificações; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.</p>
+<p>A <a href="#tbl-sensibilidade" class="quarto-xref">Tabela 5</a> e a <a href="#tbl-diferenca-sensibilidade" class="quarto-xref">Tabela 6</a> comparam a análise principal com a análise de sensibilidade. Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi 0,021 (IC 95 % −0,019 a 0,061). Com a creatinina linear, foi 0,024 (IC 95 % −0,020 a 0,068) (p = 0,291): a diferença entre os modelos manteve-se pequena e o IC continuou a incluir 0 (<a href="#fig-sensibilidade-roc" class="quarto-xref">Figura 5</a>). A <a href="#tbl-sensibilidade" class="quarto-xref">Tabela 5</a> apresenta também a calibração de cada modelo nas duas especificações (<a href="#fig-sensibilidade-calibracao" class="quarto-xref">Figura 6</a>). A forma da creatinina não alterou, portanto, a conclusão; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Mostrar o código</summary>
@@ -3810,31 +3813,48 @@ Figura 6: Calibração na validação cruzada da análise de sensibilidade (cre
 </section>
 <section id="discussão" class="level2">
 <h2 class="anchored" data-anchor-id="discussão">Discussão</h2>
-<p>O resultado principal numa frase. Como se compara com o que se sabia. As limitações do desenho e dos dados, com o efeito provável de cada uma sobre o resultado. O que se faria a seguir.</p>
+<p>Depois de corrigido o otimismo, o modelo com creatinina sérica e fração de ejeção discriminou quase tão bem como o modelo com as 11 variáveis clínicas: a diferença de AUC validada foi de 0,021 (IC 95 % −0,019 a 0,061) a favor do modelo completo (<a href="#fig-roc-2" class="quarto-xref">Figura 3 (b)</a>). O IC é compatível com a ausência de diferença, mas também com uma vantagem do modelo 4 de até 0,061, pelo que os dados não demonstram que os dois modelos são equivalentes. Nas análises secundárias, o modelo 4 teve mais otimismo e um declive de calibração mais afastado de 1 (0,83 contra 0,94), como se espera com 8,0 mortes por parâmetro, embora os IC dos dois declives se sobreponham.</p>
+<p>Em termos clínicos, a diferença estimada significa que, em cada 100 pares formados por um doente que morreu e outro que sobreviveu, o modelo completo atribui o risco mais alto ao doente que morreu em mais 2 pares do que o modelo de duas variáveis; no limite superior do IC, seriam mais 6. É um ganho pequeno para um modelo que exige mais nove variáveis e mostra mais sinais de sobreajustamento. Como não fixámos um limiar de decisão, não sabemos se esta diferença alteraria decisões clínicas.</p>
+<p>Chicco e Jurman (4) concluíram que estas duas variáveis, sozinhas, davam previsões mais exatas do que todas as variáveis juntas, com base sobretudo no coeficiente de correlação de Matthews, uma métrica de classificação. Os nossos resultados são compatíveis com um modelo simples quase tão bom como o completo, mas não mostram que seja melhor, e acrescentam a calibração e a incerteza das estimativas. Com todas as variáveis, o melhor classificador desses autores teve uma AUC de 0,800, e o modelo de Cox de Ahmad et al. (3), validado por <em>bootstrap</em>, teve AUC de 0,81 aos 250 dias e de 0,77 aos 50 dias e declive de calibração de 0,96: valores da mesma ordem dos do nosso modelo 4 (AUC validada de 0,781).</p>
 <section id="limitações" class="level3">
 <h3 class="anchored" data-anchor-id="limitações">Limitações</h3>
-<p>A base de dados não inclui os tratamentos recebidos, pelo que estes não foram considerados nos modelos. Também não identifica o hospital de cada doente, o que impediu avaliar a heterogeneidade entre centros. A equidade dos modelos não foi avaliada: 64,9 % dos doentes são homens e todos provêm de uma só população.</p>
+<ul>
+<li><strong>Seguimento variável.</strong> O seguimento durou entre 4 e 285 dias e a morte foi tratada como desfecho binário: quem foi seguido poucos dias conta como sobrevivente, mesmo que tenha morrido depois. Este erro de classificação reduz provavelmente a discriminação dos dois modelos de forma semelhante e deve afetar pouco a diferença entre eles, mas as probabilidades previstas não correspondem a um prazo fixo, o que limita a interpretação do risco absoluto.</li>
+<li><strong>Dois hospitais e um ano.</strong> Os doentes vêm de dois hospitais da mesma cidade, internados entre abril e dezembro de 2015, e a base não identifica o hospital de cada um, o que impediu avaliar a heterogeneidade entre centros. Noutra população, é provável que a discriminação seja mais baixa e que a calibração se altere, e a diferença entre os modelos pode não ser a mesma.</li>
+<li><strong>Confundimento não medido.</strong> A base não regista os tratamentos recebidos, a classe da NYHA de cada doente nem biomarcadores como os péptidos natriuréticos. Os coeficientes não têm interpretação causal, e um modelo que incluísse estes preditores poderia superar o modelo 1 por uma margem maior do que a observada.</li>
+<li><strong>Poucas mortes.</strong> Com 96 mortes, os IC são largos: a amostra não distingue a ausência de diferença de uma vantagem de 0,061 na AUC. É esta imprecisão que impede concluir pela equivalência.</li>
+<li><strong>Escolhas feitas nos mesmos dados.</strong> As duas variáveis do modelo 1 foram selecionadas por Chicco e Jurman (4) nestes mesmos doentes, e esse otimismo não foi corrigido: em doentes novos, a vantagem do modelo completo pode ser maior do que a estimada. A forma da creatinina também foi escolhida com todos os dados, mas a análise de sensibilidade sugere que pesou pouco.</li>
+<li><strong>Equidade.</strong> Não avaliámos o desempenho por subgrupos: 64,9 % dos doentes são homens e todos provêm de uma só população. Não sabemos se a conclusão se mantém nas mulheres ou noutros grupos.</li>
+</ul>
 </section>
 <section id="transportabilidade" class="level3">
 <h3 class="anchored" data-anchor-id="transportabilidade">Transportabilidade</h3>
-<p>Na prática, o modelo 1 usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção), e não foi pensado para situações com dados em falta.</p>
+<p>A conclusão só se pode transportar para doentes semelhantes aos da coorte: adultos com 40 ou mais anos, internados com insuficiência cardíaca com disfunção sistólica do ventrículo esquerdo, em classe III ou IV da NYHA. Não se aplica, sem nova avaliação, a doentes com fração de ejeção preservada, seguidos em ambulatório ou de outros sistemas de saúde, como o português.</p>
+<p>Sem dados de outro hospital, não houve validação externa. Para usar o modelo 1 noutro contexto, faltaria validá-lo numa amostra local com um prazo de previsão fixo, recalibrá-lo para a mortalidade desse hospital e confirmar que a creatinina e a fração de ejeção são medidas da mesma forma. Na prática, o modelo usaria apenas uma análise de rotina (creatinina sérica) e o ecocardiograma (fração de ejeção); não foi pensado para dados em falta e não deve ser aplicado sem um destes valores. Os utilizadores previstos são os médicos que acompanham estes doentes no internamento, que precisam de saber interpretar uma probabilidade e a sua incerteza; a previsão não substitui o juízo clínico.</p>
+</section>
+<section id="próximos-passos" class="level3">
+<h3 class="anchored" data-anchor-id="próximos-passos">Próximos passos</h3>
+<p>O passo seguinte seria a validação externa numa coorte independente, com o mesmo tempo de seguimento para todos os doentes ou com um modelo de sobrevivência, que usa o tempo até à morte. Uma amostra com mais mortes permitiria testar a equivalência dos dois modelos com uma margem definida antes da análise. Faltaria ainda avaliar a utilidade clínica, com limiares de decisão, e o desempenho por sexo e por idade.</p>
+</section>
+<section id="conclusão" class="level3">
+<h3 class="anchored" data-anchor-id="conclusão">Conclusão</h3>
+<p>Nesta coorte, um modelo com creatinina sérica e fração de ejeção previu a morte durante o seguimento com discriminação próxima da de um modelo com 11 variáveis e sem sinais de pior calibração. A incerteza não permite afirmar que os dois são equivalentes, e o resultado, de validação interna numa só população, justifica uma validação externa, não o uso clínico do modelo.</p>
 </section>
 </section>
 <section id="declaração-de-uso-de-inteligência-artificial" class="level2">
 <h2 class="anchored" data-anchor-id="declaração-de-uso-de-inteligência-artificial">Declaração de uso de inteligência artificial</h2>
-<p>Declaramos que na elaboração deste trabalho foi utilizada a seguinte ferramenta de inteligência artificial generativa:</p>
+<p>Declaramos que na elaboração deste trabalho foram utilizadas ferramentas de inteligência artificial generativa:</p>
 <ul>
-<li>Ferramenta: [nome e versão]</li>
-<li>Tipo de assistência: [indicar]</li>
-<li>Nível HEAT-AI do uso: [mínimo / limitado / alto]</li>
-<li>Secções em que foi aplicada: [indicar]</li>
-<li>Prompts utilizados: [lista resumida; os prompts completos, se forem longos, num anexo no fim do relatório]</li>
-<li>Verificações humanas efetuadas: [indicar]</li>
-<li>Período de utilização: [de dd/mm a dd/mm]</li>
+<li>Ferramenta: Claude (Anthropic); na sessão de 20/11, o modelo Claude Fable 5.2, através do Claude Code. <strong>[PREENCHER: modelo e versão usados nas outras sessões, incluindo o assistente «professor-mais»]</strong></li>
+<li>Tipo de assistência: apoio à escrita de código R; apoio à organização do projeto (Git, GitHub, guia, README e lista de tarefas); primeira versão do texto da Discussão; verificação das referências e da renderização do relatório.</li>
+<li>Nível HEAT-AI do uso: <strong>[PREENCHER: mínimo / limitado / alto]</strong></li>
+<li>Secções em que foi aplicada: Métodos e Resultados (código); Discussão (primeira versão do texto); esta declaração e o Anexo D.</li>
+<li>Prompts utilizados: lista resumida, por elemento do grupo, no <a href="#anexo-ia">Anexo D</a>.</li>
+<li>Verificações humanas efetuadas: <strong>[PREENCHER: código testado; resultados refeitos; fontes confirmadas no original; controlo de privacidade]</strong> O que o grupo corrigiu ou rejeitou nas respostas dos modelos está no Anexo D.</li>
+<li>Período de utilização: <strong>[PREENCHER: de dd/mm]</strong> a 20/11.</li>
 </ul>
 <p>O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pela ferramenta. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.</p>
-<p>Se não foi usada IA: “Declaramos que não foi utilizada nenhuma ferramenta de inteligência artificial generativa na elaboração deste trabalho.”</p>
-<p>Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0); a declaração pode ser gerada no Themis (https://tiagojacinto.eu/fmup-ia/themis/).</p>
+<p>Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0).</p>
 </section>
 <section id="referências" class="level2">
 <h2 class="anchored" data-anchor-id="referências">Referências</h2>
@@ -4028,7 +4048,7 @@ Tabela 7: Coeficientes (β) dos modelos de regressão logística, na escala do 
 <td>3b</td>
 <td>D;E</td>
 <td>População-alvo, finalidade no percurso de cuidados e utilizadores previstos</td>
-<td>Introdução (§1)</td>
+<td>Introdução (§1); Discussão – Transportabilidade</td>
 </tr>
 <tr class="odd">
 <td>3c</td>
@@ -4322,7 +4342,7 @@ Tabela 7: Coeficientes (β) dos modelos de regressão logística, na escala do 
 <td>25</td>
 <td>D;E</td>
 <td>Interpretação geral, incluindo equidade e estudos anteriores</td>
-<td>Discussão (§1–3)</td>
+<td>Discussão (§1–3); Limitações (equidade); Conclusão</td>
 </tr>
 <tr class="even">
 <td>26</td>
@@ -4400,6 +4420,71 @@ loaded via a namespace (and not attached):
 [57] jsonlite_2.0.0     R6_2.6.1           fs_2.1.0          </code></pre>
 </div>
 </div>
+</section>
+<section id="anexo-ia" class="level2">
+<h2 class="anchored" data-anchor-id="anexo-ia">Anexo D: registo do uso de inteligência artificial</h2>
+<section id="prompts-utilizados" class="level3">
+<h3 class="anchored" data-anchor-id="prompts-utilizados">Prompts utilizados</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 17%">
+<col style="width: 35%">
+<col style="width: 35%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Elemento</th>
+<th>Ferramenta e data</th>
+<th>Para quê</th>
+<th>Prompts</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Joaquim Santos</td>
+<td>Claude Fable 5.2 (Claude Code), 20/11</td>
+<td>Juntar as alterações ainda por aprovar e confirmar que o relatório renderiza numa pasta limpa; escrever a primeira versão da Discussão, a partir dos resultados e da lista de tarefas do grupo; acrescentar o desenho do estudo aos Métodos e as referências cruzadas à análise de sensibilidade; confirmar as referências; preparar esta declaração</td>
+<td>«quero que continues o trabalho. Em que parte vamos, o que falta fazer?»; «quero 2 coisas. 1, que coloques aqui o ficheiro completo do que já foi escrito. 2, que faças o que falta fazer»; «mas deves fazer o que falta num branch à parte»; «o resumo não o faças. Continua»</td>
+</tr>
+<tr class="even">
+<td>Isabelle Araújo</td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+</tr>
+<tr class="odd">
+<td>João Santos</td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+</tr>
+<tr class="even">
+<td>Raquel Bragança</td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+<td><strong>[PREENCHER]</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="texto-e-código-produzidos-por-ia" class="level3">
+<h3 class="anchored" data-anchor-id="texto-e-código-produzidos-por-ia">Texto e código produzidos por IA</h3>
+<ul>
+<li>Funções <code>logit_por_decil()</code>, <code>teste_forma()</code>, <code>ajustar()</code>, <code>calibracao()</code> e <code>resumo_calibracao()</code>; histogramas; código da AUC aparente, da validação cruzada, da comparação principal e da calibração; comentários sobre a distribuição das variáveis e a linearidade no logit.</li>
+<li>Guia de Git, README e lista de tarefas do projeto.</li>
+<li>Primeira versão da Discussão (20/11). <strong>[PREENCHER: o que o grupo alterou depois de a rever]</strong></li>
+</ul>
+</section>
+<section id="o-que-o-grupo-corrigiu-ou-rejeitou" class="level3">
+<h3 class="anchored" data-anchor-id="o-que-o-grupo-corrigiu-ou-rejeitou">O que o grupo corrigiu ou rejeitou</h3>
+<ul>
+<li>16/11: rejeitámos um ramo (<em>branch</em>) proposto; questionámos a Tabela 1 e os histogramas.</li>
+<li>17/11: questionámos a <em>spline</em> e simplificámos o critério do AIC; testámos a forma só das variáveis assimétricas; rejeitámos uma análise de sensibilidade a 90 dias; propusemos usar os modelos 2 e 3 como análise de sensibilidade.</li>
+<li>20/11: não aceitámos o Resumo que a ferramenta tinha começado a escrever; essa versão foi retirada.</li>
+<li><strong>[PREENCHER: o porquê de cada decisão]</strong></li>
+</ul>
+</section>
 </section>
 
 </main>
