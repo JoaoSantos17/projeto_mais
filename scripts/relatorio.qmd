@@ -265,7 +265,7 @@ A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), 
 
 A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a *calibration-in-the-large* (ideal 0) e o declive (ideal 1), com IC 95 %.
 
-<!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
+Como análise de sensibilidade, repetimos a validação cruzada em 10 partes, a comparação das AUC e a avaliação da calibração substituindo o logaritmo da creatinina pela sua forma linear. Usámos as mesmas partes e a mesma semente da análise principal.
 
 A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
@@ -587,7 +587,128 @@ grafico_calibracao(cal4)
 
 ### Análise de sensibilidade
 
-<!-- Secção 8 do analise.R: ainda por fazer. -->
+```{r}
+#| label: sensibilidade
+# Os modelos diferem dos principais apenas pela forma funcional da creatinina.
+f1_linear <- y ~ serum_creatinine + ejection_fraction
+f4_linear <- y ~ serum_creatinine + ejection_fraction + age + serum_sodium +
+  anaemia + high_blood_pressure + diabetes + sex + smoking +
+  creatinine_phosphokinase + platelets
+
+pcv1_linear <- numeric(nrow(dataset))
+pcv4_linear <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+
+  pcv1_linear[dataset$parte == k] <- ajustar(f1_linear, treino, teste)
+  pcv4_linear[dataset$parte == k] <- ajustar(f4_linear, treino, teste)
+}
+
+roc_cv1_linear <- roc(dataset$y, pcv1_linear, quiet = TRUE)
+roc_cv4_linear <- roc(dataset$y, pcv4_linear, quiet = TRUE)
+ci_cv1_linear  <- ci.auc(roc_cv1_linear)
+ci_cv4_linear  <- ci.auc(roc_cv4_linear)
+
+comp_linear <- roc.test(
+  roc_cv1_linear, roc_cv4_linear, paired = TRUE, method = "delong"
+)
+dif_auc_linear <- auc(roc_cv4_linear) - auc(roc_cv1_linear)
+dif_inf_linear <- -comp_linear$conf.int[2]
+dif_sup_linear <- -comp_linear$conf.int[1]
+
+dados_cv1_linear <- data.frame(y = dataset$y, p = pcv1_linear)
+dados_cv4_linear <- data.frame(y = dataset$y, p = pcv4_linear)
+res_cal1_linear <- resumo_calibracao(dados_cv1_linear)
+res_cal4_linear <- resumo_calibracao(dados_cv4_linear)
+cal1_linear <- calibracao(dados_cv1_linear)
+cal4_linear <- calibracao(dados_cv4_linear)
+```
+
+```{r}
+#| label: tbl-sensibilidade
+#| tbl-cap: "Desempenho na validação cruzada, com a creatinina em logaritmo ou linear."
+bind_rows(
+  tibble(
+    Análise = "Principal (log)",
+    Modelo = c("1", "4"),
+    auc = c(auc(roc_cv1), auc(roc_cv4)),
+    auc_inf = c(ci_cv1[1], ci_cv4[1]),
+    auc_sup = c(ci_cv1[3], ci_cv4[3]),
+    citl = c(res_cal1$citl, res_cal4$citl),
+    citl_inf = c(res_cal1$citl_inf, res_cal4$citl_inf),
+    citl_sup = c(res_cal1$citl_sup, res_cal4$citl_sup),
+    declive = c(res_cal1$declive, res_cal4$declive),
+    declive_inf = c(res_cal1$declive_inf, res_cal4$declive_inf),
+    declive_sup = c(res_cal1$declive_sup, res_cal4$declive_sup)
+  ),
+  tibble(
+    Análise = "Sensibilidade (linear)",
+    Modelo = c("1", "4"),
+    auc = c(auc(roc_cv1_linear), auc(roc_cv4_linear)),
+    auc_inf = c(ci_cv1_linear[1], ci_cv4_linear[1]),
+    auc_sup = c(ci_cv1_linear[3], ci_cv4_linear[3]),
+    citl = c(res_cal1_linear$citl, res_cal4_linear$citl),
+    citl_inf = c(res_cal1_linear$citl_inf, res_cal4_linear$citl_inf),
+    citl_sup = c(res_cal1_linear$citl_sup, res_cal4_linear$citl_sup),
+    declive = c(res_cal1_linear$declive, res_cal4_linear$declive),
+    declive_inf = c(res_cal1_linear$declive_inf, res_cal4_linear$declive_inf),
+    declive_sup = c(res_cal1_linear$declive_sup, res_cal4_linear$declive_sup)
+  )
+) |>
+  transmute(
+    Análise,
+    Modelo,
+    `AUC validada (IC 95 %)` = paste0(num(auc), " (", num(auc_inf), "–", num(auc_sup), ")"),
+    `CITL (IC 95 %)` = paste0(num(citl), " (", num(citl_inf), " a ", num(citl_sup), ")"),
+    `Declive (IC 95 %)` = paste0(num(declive), " (", num(declive_inf), " a ", num(declive_sup), ")")
+  ) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: tbl-diferenca-sensibilidade
+#| tbl-cap: "Diferença de AUC validada (modelo 4 − modelo 1) na análise principal e na análise de sensibilidade."
+tibble(
+  Análise = c("Principal (log)", "Sensibilidade (linear)"),
+  diferença = c(dif_auc, dif_auc_linear),
+  inferior = c(dif_inf, dif_inf_linear),
+  superior = c(dif_sup, dif_sup_linear),
+  p = c(dif_p, comp_linear$p.value)
+) |>
+  transmute(
+    Análise,
+    `Diferença de AUC (IC 95 %)` = paste0(num(diferença), " (", num(inferior), " a ", num(superior), ")"),
+    `p` = num_p(p)
+  ) |>
+  knitr::kable()
+```
+
+Na análise principal, a diferença de AUC validada (modelo 4 − modelo 1) foi `r num_ic(dif_auc, dif_inf, dif_sup)`. Com a creatinina linear, foi `r num_ic(dif_auc_linear, dif_inf_linear, dif_sup_linear)` (p = `r num_p(comp_linear$p.value)`). A tabela apresenta também a calibração de cada modelo nas duas especificações; esta análise de sensibilidade avalia a robustez à forma funcional e não demonstra equivalência entre os modelos.
+
+```{r}
+#| label: fig-sensibilidade-roc
+#| fig-cap: "Curvas ROC na validação cruzada da análise de sensibilidade (creatinina linear)."
+grafico_roc(setNames(
+  list(roc_cv1_linear, roc_cv4_linear),
+  c(legenda_auc("Modelo 1", roc_cv1_linear),
+    legenda_auc("Modelo 4", roc_cv4_linear))
+))
+```
+
+```{r}
+#| label: fig-sensibilidade-calibracao
+#| fig-cap: "Calibração na validação cruzada da análise de sensibilidade (creatinina linear)."
+#| fig-subcap:
+#|   - "Modelo 1"
+#|   - "Modelo 4"
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 4
+grafico_calibracao(cal1_linear)
+grafico_calibracao(cal4_linear)
+```
 
 ## Discussão
 
@@ -727,7 +848,7 @@ Recomendações resumidas e traduzidas; texto original em Collins et al. (5). D 
 | 20a | D;E | Fluxo de participantes, n com e sem desfecho, seguimento | Resultados – Caracterização da amostra |
 | 20b | D;E | Características dos participantes | Resultados – Tabela 1 |
 | 20c | E | Comparação com os dados de desenvolvimento | Não aplicável |
-| 21 | D;E | N de participantes e eventos em cada análise | Resultados; Análise de sensibilidade [A PREENCHER] |
+| 21 | D;E | N de participantes e eventos em cada análise | Resultados – Caracterização; Análise de sensibilidade (mesmos participantes) |
 | 22 | D | Modelo completo, para outros o poderem aplicar | Anexo A – Coeficientes |
 | 23a | D;E | Desempenho com IC, incluindo subgrupos | Resultados – Discriminação, Comparação principal, Calibração |
 | 23b | D;E | Heterogeneidade do desempenho entre centros | Não aplicável |
