@@ -17,7 +17,7 @@ dataset <- read_csv(
 names(dataset)
 
 # Desfecho como coluna y DENTRO dos dados, em 0/1 numérico:
-# as funções das secções 4 a 7 usam dados$y e a calibração faz contas com ele
+# as funções das secções 4 a 7 usam dataset$y e a calibração faz contas com ele
 dataset <- dataset |>
   mutate(y = DEATH_EVENT)
 
@@ -25,10 +25,12 @@ dataset <- dataset |>
 # 2. Table 1 ----------------------------------------------------------------
 # Características dos doentes estratificadas pelo desfecho, mais a coluna do total.
 # O fator com rótulos é criado só dentro deste pipe, para não alterar o y
-# numérico guardado em dados.
+# numérico guardado em dataset.
 # O time fica de fora: é o tempo de seguimento, não uma característica do doente.
 # Contínuas em mediana [IIQ]: várias são muito assimétricas (CPK, creatinina).
 # Nas binárias (0/1), o gtsummary conta os doentes com valor 1.
+# Sexo: a codificação 1 = masculino foi inferida por contagem (há 194 doentes
+# com sex = 1, tantos como os homens descritos por Ahmad et al., 2017).
 table_1 <- dataset |>
   mutate(y = factor(y, levels = c(0, 1), labels = c("Sobreviveu", "Morreu"))) |>
   select(y, age, sex, smoking, anaemia, diabetes, high_blood_pressure,
@@ -431,5 +433,122 @@ ggplot(cal4, aes(x = prevista, y = observada)) +
        title = "Calibração — Modelo 4 (validação cruzada)") +
   theme_minimal()
 
-# 8. Análise de sensibilidade
-# 9. Figuras
+# 8. Análise de sensibilidade: creatinina linear ------------------------------
+#
+# Repete a validação cruzada, a comparação das AUC e a calibração sem
+# transformar a creatinina. Mantêm-se as mesmas partes da análise principal.
+f1_linear <- y ~ serum_creatinine + ejection_fraction
+f4_linear <- y ~ serum_creatinine + ejection_fraction + age + serum_sodium +
+  anaemia + high_blood_pressure + diabetes + sex + smoking +
+  creatinine_phosphokinase + platelets
+
+pcv1_linear <- numeric(nrow(dataset))
+pcv4_linear <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+
+  pcv1_linear[dataset$parte == k] <- ajustar(f1_linear, treino, teste)
+  pcv4_linear[dataset$parte == k] <- ajustar(f4_linear, treino, teste)
+}
+
+roc_cv1_linear <- roc(dataset$y, pcv1_linear, quiet = TRUE)
+roc_cv4_linear <- roc(dataset$y, pcv4_linear, quiet = TRUE)
+ci_cv1_linear  <- ci.auc(roc_cv1_linear)
+ci_cv4_linear  <- ci.auc(roc_cv4_linear)
+
+comp_linear <- roc.test(
+  roc_cv1_linear, roc_cv4_linear, paired = TRUE, method = "delong"
+)
+dif_auc_linear <- auc(roc_cv4_linear) - auc(roc_cv1_linear)
+dif_inf_linear <- -comp_linear$conf.int[2]
+dif_sup_linear <- -comp_linear$conf.int[1]
+
+cat("Sensibilidade — Modelo 1, AUC validada:",
+    round(auc(roc_cv1_linear), 3), "(IC 95%",
+    round(ci_cv1_linear[1], 3), "a", round(ci_cv1_linear[3], 3), ")\n")
+cat("Sensibilidade — Modelo 4, AUC validada:",
+    round(auc(roc_cv4_linear), 3), "(IC 95%",
+    round(ci_cv4_linear[1], 3), "a", round(ci_cv4_linear[3], 3), ")\n")
+cat("Sensibilidade — diferença de AUC (modelo 4 − modelo 1):",
+    round(dif_auc_linear, 3), "(IC 95%",
+    round(dif_inf_linear, 3), "a", round(dif_sup_linear, 3),
+    "); p =", signif(comp_linear$p.value, 3), "\n")
+
+tibble(
+  Análise = c("Principal (log)", "Sensibilidade (linear)"),
+  `AUC modelo 1 (IC 95 %)` = c(
+    paste0(round(auc(roc_cv1), 3), " (", round(ci_cv1[1], 3),
+           " a ", round(ci_cv1[3], 3), ")"),
+    paste0(round(auc(roc_cv1_linear), 3), " (", round(ci_cv1_linear[1], 3),
+           " a ", round(ci_cv1_linear[3], 3), ")")
+  ),
+  `AUC modelo 4 (IC 95 %)` = c(
+    paste0(round(auc(roc_cv4), 3), " (", round(ci_cv4[1], 3),
+           " a ", round(ci_cv4[3], 3), ")"),
+    paste0(round(auc(roc_cv4_linear), 3), " (", round(ci_cv4_linear[1], 3),
+           " a ", round(ci_cv4_linear[3], 3), ")")
+  ),
+  `Diferença de AUC (IC 95 %)` = c(
+    paste0(round(auc(roc_cv4) - auc(roc_cv1), 3), " (",
+           round(-comp$conf.int[2], 3), " a ", round(-comp$conf.int[1], 3), ")"),
+    paste0(round(dif_auc_linear, 3), " (", round(dif_inf_linear, 3),
+           " a ", round(dif_sup_linear, 3), ")")
+  ),
+  p = c(comp$p.value, comp_linear$p.value)
+) |>
+  mutate(p = signif(p, 3)) |>
+  print()
+
+roc_cv_linear_list <- setNames(
+  list(roc_cv1_linear, roc_cv4_linear),
+  c(paste0("Modelo 1 (AUC = ", round(auc(roc_cv1_linear), 3),
+           "; IC 95% ", round(ci_cv1_linear[1], 3), "–",
+           round(ci_cv1_linear[3], 3), ")"),
+    paste0("Modelo 4 (AUC = ", round(auc(roc_cv4_linear), 3),
+           "; IC 95% ", round(ci_cv4_linear[1], 3), "–",
+           round(ci_cv4_linear[3], 3), ")"))
+)
+
+ggroc(roc_cv_linear_list) +
+  geom_abline(intercept = 1, slope = 1, linetype = "dashed", colour = "grey50") +
+  labs(x = "Especificidade", y = "Sensibilidade", colour = NULL,
+       title = "Curvas ROC — sensibilidade (creatinina linear)") +
+  theme_minimal()
+
+dados_cv1_linear <- data.frame(y = dataset$y, p = pcv1_linear)
+dados_cv4_linear <- data.frame(y = dataset$y, p = pcv4_linear)
+
+bind_rows(
+  resumo_calibracao(dados_cv1) |> mutate(Análise = "Principal (log)", Modelo = "1"),
+  resumo_calibracao(dados_cv4) |> mutate(Análise = "Principal (log)", Modelo = "4"),
+  resumo_calibracao(dados_cv1_linear) |> mutate(Análise = "Sensibilidade (linear)", Modelo = "1"),
+  resumo_calibracao(dados_cv4_linear) |> mutate(Análise = "Sensibilidade (linear)", Modelo = "4")
+) |>
+  select(Análise, Modelo, everything()) |>
+  print()
+
+cal1_linear <- calibracao(dados_cv1_linear)
+cal4_linear <- calibracao(dados_cv4_linear)
+
+ggplot(cal1_linear, aes(x = prevista, y = observada)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = "grey50") +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(x = "Probabilidade prevista", y = "Proporção observada",
+       title = "Calibração — Modelo 1 (creatinina linear)") +
+  theme_minimal()
+
+ggplot(cal4_linear, aes(x = prevista, y = observada)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", colour = "grey50") +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(x = "Probabilidade prevista", y = "Proporção observada",
+       title = "Calibração — Modelo 4 (creatinina linear)") +
+  theme_minimal()
+
+# 9. Figuras -------------------------------------------------------------------
+#
+# Todos os gráficos deste script têm eixos e legendas em português. As versões
+# finais, numeradas e com legenda, são geradas no scripts/relatorio.qmd.
