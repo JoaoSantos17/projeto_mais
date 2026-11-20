@@ -431,5 +431,4 @@ ggplot(cal4, aes(x = prevista, y = observada)) +
        title = "Calibração — Modelo 4 (validação cruzada)") +
   theme_minimal()
 
-# 8. Análise de sensibilidade
-# 9. Figuras
+# 8. Figuras

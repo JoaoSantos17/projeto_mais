@@ -52,12 +52,10 @@ A.5 Secção 7 — calibração (✔ feita):
   ✔ Gráficos de calibração dos modelos 1 e 4 @done(26-11-17)
      Mod 1: CITL 0,007; declive 0,94. Mod 4: CITL 0,018; declive 0,83
 
-A.6 Secção 8 — análise de sensibilidade ← PRÓXIMO PASSO:
-  ☐ Sensibilidade: repetir secções 5–7 com creatinina LINEAR (em vez de log) @critical
-     Testa se a decisão da secção 3.3 afeta a conclusão
-  ☐ Comparar os resultados com a análise principal
+A.6 Análise de sensibilidade — NÃO FAZER (decisão do João, 20/11):
+  ✘ Retirada do analise.R e do relatório (Métodos, Resultados, Anexo B) @cancelled(26-11-20)
 
-A.7 Secção 9 — figuras finais:
+A.7 Secção 8 — figuras finais:
   ☐ Verificar que todos os gráficos têm eixos e legendas em português
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -95,7 +93,10 @@ B.5 Discussão:
   ☐ Item 27b da TRIPOD+AI: decidir quem usaria o modelo e que competências exige, e acrescentar à subsecção Transportabilidade
 
 B.6 Resumo (abstract):
-  ☐ 250–350 palavras, 6 movimentos, resultados com números, sem referências
+  ✔ 250–350 palavras (345), 6 movimentos, resultados com números, sem referências @raquel @done(26-11-20)
+
+B.9 Nomes dos modelos:
+  ✔ "Modelo 1" e "modelo 4" passam a "modelo reduzido" e "modelo completo" em todo o relatório @raquel @done(26-11-20)
 
 B.7 Referências:
   ☐ Vancouver, numeradas pela ordem de citação, todas verificadas na fonte
