@@ -52,10 +52,10 @@ A.5 Secção 7 — calibração (✔ feita):
   ✔ Gráficos de calibração dos modelos 1 e 4 @done(26-11-17)
      Mod 1: CITL 0,007; declive 0,94. Mod 4: CITL 0,018; declive 0,83
 
-A.6 Secção 8 — análise de sensibilidade (✔ feita):
-  ✔ Sensibilidade: repetir secções 5–7 com creatinina LINEAR (em vez de log) @critical @done(26-11-19)
+A.6 Secção 8 — análise de sensibilidade ← PRÓXIMO PASSO (João):
+  ☐ Sensibilidade: repetir secções 5–7 com creatinina LINEAR (em vez de log) @critical
      Testa se a decisão da secção 3.3 afeta a conclusão
-  ✔ Comparar os resultados com a análise principal @done(26-11-19)
+  ☐ Comparar os resultados com a análise principal
 
 A.7 Secção 9 — figuras finais:
   ✔ Verificar que todos os gráficos têm eixos e legendas em português @done(26-11-20)
@@ -86,7 +86,7 @@ B.3 Métodos:
 B.4 Resultados:
   ✔ Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figuras @done(26-11-19)
   ✔ IC interpretados no texto @done(26-11-19)
-  ✔ Análise de sensibilidade: escrever os resultados (creatinina linear) na subsecção vazia dos Resultados; depende da secção 8 do analise.R (A.6) @critical @done(26-11-19)
+  ☐ Análise de sensibilidade: escrever os resultados (creatinina linear) na subsecção vazia dos Resultados; depende da secção 8 do analise.R (A.6) @critical
 
 B.5 Discussão (primeira versão escrita com IA em 20/11; falta a revisão do grupo):
   ✔ Resultado principal numa frase @done(26-11-20)
