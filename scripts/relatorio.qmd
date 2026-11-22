@@ -244,7 +244,7 @@ res_cal4 <- resumo_calibracao(dados_cv4)
 
 ## Resumo
 
-**Contexto.** A insuficiência cardíaca tem elevada mortalidade e estimar o risco de morte na admissão pode orientar decisões clínicas. Chicco e Jurman (2020) sugeriram que a creatinina sérica e a fração de ejeção bastam para prever a sobrevivência, mas a conclusão assenta em métricas de classificação, sem correção do otimismo.
+**Contexto.** A insuficiência cardíaca tem elevada mortalidade e estimar o risco de morte na admissão pode orientar decisões clínicas. Um estudo anterior nesta base de dados sugeriu que a creatinina sérica e a fração de ejeção bastam para prever a sobrevivência, mas a conclusão assenta em métricas de classificação, sem correção do otimismo.
 
 **Lacuna.** Não se sabe se esta conclusão se mantém quando se corrige o otimismo por validação cruzada e se avalia a calibração dos modelos.
 
@@ -252,7 +252,7 @@ res_cal4 <- resumo_calibracao(dados_cv4)
 
 **Métodos.** Foram analisados `r nrow(dataset)` doentes com insuficiência cardíaca da base *Heart Failure Clinical Records*, uma coorte retrospetiva de dois hospitais em Faisalabad, Paquistão. O desfecho foi a morte durante o seguimento (`r sum(dataset$y)` mortes, `r num(100 * mean(dataset$y), 1)` %). A discriminação foi medida pela AUC e a calibração pela calibração global e pelo declive, após validação cruzada em 10 partes. A comparação usou a diferença de AUC com IC de 95 % pelo método de DeLong emparelhado.
 
-**Resultados.** A AUC validada foi de `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e de `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc, dif_inf, dif_sup)` (p = `r num_p(dif_p)`), compatível tanto com a ausência de diferença como com uma pequena vantagem do modelo completo. O declive de calibração foi de `r num(res_cal1$declive, 2)` no modelo 1 e de `r num(res_cal4$declive, 2)` no modelo 4.
+**Resultados.** A AUC validada foi de `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e de `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc, dif_inf, dif_sup)` (p = `r num_p(dif_p)`), compatível tanto com a ausência de diferença como com uma pequena vantagem do modelo completo. O declive de calibração foi de `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup, 2)` no modelo 1 e de `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup, 2)` no modelo 4.
 
 **Conclusões.** Nesta coorte, o modelo com duas variáveis discriminou de forma semelhante ao modelo completo e sem sinais de pior calibração. A incerteza das estimativas não permite concluir pela equivalência e o resultado, de validação interna numa só população, requer validação externa antes de qualquer uso clínico.
 
@@ -282,7 +282,7 @@ A base contém 13 variáveis: 11 características clínicas, o tempo de seguimen
 - 6 variáveis numéricas contínuas: “Idade, anos”, "Creatina fosfoquinase (CPK), mcg/L", "Fração de ejeção, %", "Plaquetas, kiloplaquetas/mL", "Creatinina sérica, mg/dL" e "Sódio sérico, mEq/L"
 - 5 variáveis categóricas binárias: "Anemia", "Diabetes", "Hipertensão arterial", "Sexo", "Fumador"
 
-As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino. A base não inclui uma descrição das variáveis; a codificação do sexo foi inferida por contagem: 194 doentes têm sex = 1, o mesmo número de homens descrito por Ahmad et al. (3).
+As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino. A base não inclui uma descrição das variáveis; a codificação do sexo foi inferida por contagem: `r sum(dataset$sex == 1)` doentes têm sex = 1, o mesmo número de homens descrito por Ahmad et al. (3).
 Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina sérica e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline cúbica pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
 
 Definimos, então, dois modelos: o modelo 1, com a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis propostas por Chicco e Jurman (4), e o modelo 4, que inclui as 11 variáveis clínicas. Com `r n_mortes` mortes, o número de mortes por parâmetro, contando a ordenada na origem, foi `r num(epp_1, 1)` no modelo 1 e `r num(epp_4, 1)` no modelo 4. Este último fica abaixo da regra prática de 10, o que faz esperar sobreajustamento.
@@ -299,7 +299,7 @@ A calibração foi avaliada nas previsões da validação cruzada: o gráfico po
 
 Como análise de sensibilidade, repetimos a comparação com a creatinina sérica na forma linear (sem logaritmo), mantendo as mesmas 10 partes da validação cruzada, para testar se a decisão da transformação logarítmica afetava a conclusão.
 
-A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
+A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary, broom, splines e knitr; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI (5); a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
 ## Resultados
 
@@ -660,11 +660,11 @@ res_cal1_lin  <- resumo_calibracao(dados_cv1_lin)
 res_cal4_lin  <- resumo_calibracao(dados_cv4_lin)
 ```
 
-Com a creatinina sérica na forma linear, a AUC validada foi de `r num_ic(auc(roc_cv1_lin), ci_cv1_lin[1], ci_cv1_lin[3])` no modelo 1 e de `r num_ic(auc(roc_cv4_lin), ci_cv4_lin[1], ci_cv4_lin[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc_lin, dif_inf_lin, dif_sup_lin)` (p = `r num_p(dif_p_lin)`). O declive de calibração foi de `r num(res_cal1_lin$declive, 2)` no modelo 1 e de `r num(res_cal4_lin$declive, 2)` no modelo 4. A conclusão da análise principal mantém-se: os dados continuam a ser compatíveis com a ausência de diferença entre os dois modelos.
+Com a creatinina sérica na forma linear, a AUC validada foi de `r num_ic(auc(roc_cv1_lin), ci_cv1_lin[1], ci_cv1_lin[3])` no modelo 1 e de `r num_ic(auc(roc_cv4_lin), ci_cv4_lin[1], ci_cv4_lin[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc_lin, dif_inf_lin, dif_sup_lin)` (p = `r num_p(dif_p_lin)`). O declive de calibração foi de `r num_ic(res_cal1_lin$declive, res_cal1_lin$declive_inf, res_cal1_lin$declive_sup, 2)` no modelo 1 e de `r num_ic(res_cal4_lin$declive, res_cal4_lin$declive_inf, res_cal4_lin$declive_sup, 2)` no modelo 4. A conclusão da análise principal mantém-se: os dados continuam a ser compatíveis com a ausência de diferença entre os dois modelos.
 
 ## Discussão
 
-Depois de corrigido o otimismo, o modelo com creatinina sérica e fração de ejeção discriminou quase tão bem como o modelo com as 11 variáveis clínicas: a diferença de AUC validada foi de `r num_ic(dif_auc, dif_inf, dif_sup)` a favor do modelo completo (@fig-roc-2). O IC é compatível com a ausência de diferença, mas também com uma vantagem do modelo 4 de até `r num(dif_sup)`, pelo que os dados não demonstram que os dois modelos são equivalentes. Nas análises secundárias, o modelo 4 teve mais otimismo e um declive de calibração mais afastado de 1 (`r num(res_cal4$declive, 2)` contra `r num(res_cal1$declive, 2)`), como se espera com `r num(epp_4, 1)` mortes por parâmetro, embora os IC dos dois declives se sobreponham.
+Depois de corrigido o otimismo, o modelo com creatinina sérica e fração de ejeção discriminou quase tão bem como o modelo com as 11 variáveis clínicas: a diferença de AUC validada foi de `r num_ic(dif_auc, dif_inf, dif_sup)` a favor do modelo completo (@fig-roc-2). O IC é compatível com a ausência de diferença, mas também com uma vantagem do modelo 4 de até `r num(dif_sup)`, pelo que os dados não demonstram que os dois modelos são equivalentes. Nas análises secundárias, o modelo 4 teve mais otimismo e um declive de calibração mais afastado de 1: `r num_ic(res_cal4$declive, res_cal4$declive_inf, res_cal4$declive_sup, 2)`, contra `r num_ic(res_cal1$declive, res_cal1$declive_inf, res_cal1$declive_sup, 2)` no modelo 1. É o que se espera com `r num(epp_4, 1)` mortes por parâmetro, embora os IC dos dois declives se sobreponham.
 
 Em termos clínicos, a diferença estimada significa que, em cada 100 pares formados por um doente que morreu e outro que sobreviveu, o modelo completo atribui o risco mais alto ao doente que morreu em mais `r num(100 * dif_auc, 0)` pares do que o modelo de duas variáveis; no limite superior do IC, seriam mais `r num(100 * dif_sup, 0)`. É um ganho pequeno para um modelo que exige mais nove variáveis e mostra mais sinais de sobreajustamento. Como não fixámos um limiar de decisão, não sabemos se esta diferença alteraria decisões clínicas.
 
