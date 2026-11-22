@@ -206,27 +206,61 @@ epp_1 <- n_mortes / length(coef(glm(f1, family = binomial, data = dataset)))
 epp_4 <- n_mortes / length(coef(glm(f4, family = binomial, data = dataset)))
 ```
 
-## Resumo (abstract)
+```{r}
+#| label: analise-para-resumo
+#| include: false
+# Corre a análise antes do Resumo para que os números inline existam.
+# Os mesmos blocos correm de novo nos Resultados (mesma semente, mesmos
+# valores); os objectos são sobrescritos sem consequência.
+set.seed(2026)
+dataset <- dataset |> mutate(parte = sample(rep(1:10, length.out = n())))
 
-Entre 250 e 350 palavras, sem referências, sem tabelas. Seis movimentos; cada um responde a uma pergunta.
+pcv1 <- numeric(nrow(dataset))
+pcv4 <- numeric(nrow(dataset))
 
-**Contexto.** Qual é o problema e o que já se sabe? Uma ou duas frases.
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+  pcv1[dataset$parte == k] <- ajustar(f1, treino, teste)
+  pcv4[dataset$parte == k] <- ajustar(f4, treino, teste)
+}
 
-**Lacuna.** O que ainda não se sabe, e que este trabalho responde? Uma frase.
+roc_cv1 <- roc(dataset$y, pcv1, quiet = TRUE)
+roc_cv4 <- roc(dataset$y, pcv4, quiet = TRUE)
+ci_cv1  <- ci.auc(roc_cv1)
+ci_cv4  <- ci.auc(roc_cv4)
 
-**Objetivo.** O que este trabalho faz? Uma frase, com a questão de avaliação implícita.
+comp     <- roc.test(roc_cv1, roc_cv4, paired = TRUE, method = "delong")
+dif_auc  <- auc(roc_cv4) - auc(roc_cv1)
+dif_inf  <- -comp$conf.int[2]
+dif_sup  <- -comp$conf.int[1]
+dif_p    <- comp$p.value
 
-**Métodos.** Que dados, que desenho, que variáveis, que análise. Duas ou três frases.
+dados_cv1 <- data.frame(y = dataset$y, p = pcv1)
+dados_cv4 <- data.frame(y = dataset$y, p = pcv4)
+res_cal1 <- resumo_calibracao(dados_cv1)
+res_cal4 <- resumo_calibracao(dados_cv4)
+```
 
-**Resultados.** Os achados principais, com números: estimativas e intervalos de confiança, não só valores de p. Duas ou três frases.
+## Resumo
 
-**Conclusões.** O que os resultados significam e para quem. Uma ou duas frases, sem ir além do que os dados mostram.
+**Contexto.** A insuficiência cardíaca tem elevada mortalidade e estimar o risco de morte na admissão pode orientar decisões clínicas. Chicco e Jurman (2020) sugeriram que a creatinina sérica e a fração de ejeção bastam para prever a sobrevivência, mas a conclusão assenta em métricas de classificação, sem correção do otimismo.
+
+**Lacuna.** Não se sabe se esta conclusão se mantém quando se corrige o otimismo por validação cruzada e se avalia a calibração dos modelos.
+
+**Objetivo.** Comparar, após validação interna, a discriminação e a calibração de um modelo de regressão logística com creatinina sérica e fração de ejeção (modelo 1) com as de um modelo com todas as variáveis clínicas (modelo 4), na previsão da morte durante o seguimento.
+
+**Métodos.** Foram analisados `r nrow(dataset)` doentes com insuficiência cardíaca da base *Heart Failure Clinical Records*, uma coorte retrospetiva de dois hospitais em Faisalabad, Paquistão. O desfecho foi a morte durante o seguimento (`r sum(dataset$y)` mortes, `r num(100 * mean(dataset$y), 1)` %). A discriminação foi medida pela AUC e a calibração pela calibração global e pelo declive, após validação cruzada em 10 partes. A comparação usou a diferença de AUC com IC de 95 % pelo método de DeLong emparelhado.
+
+**Resultados.** A AUC validada foi de `r num_ic(auc(roc_cv1), ci_cv1[1], ci_cv1[3])` no modelo 1 e de `r num_ic(auc(roc_cv4), ci_cv4[1], ci_cv4[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc, dif_inf, dif_sup)` (p = `r num_p(dif_p)`), compatível tanto com a ausência de diferença como com uma pequena vantagem do modelo completo. O declive de calibração foi de `r num(res_cal1$declive, 2)` no modelo 1 e de `r num(res_cal4$declive, 2)` no modelo 4.
+
+**Conclusões.** Nesta coorte, o modelo com duas variáveis discriminou de forma semelhante ao modelo completo e sem sinais de pior calibração. A incerteza das estimativas não permite concluir pela equivalência e o resultado, de validação interna numa só população, requer validação externa antes de qualquer uso clínico.
 
 ## Introdução
 
 A insuficiência cardíaca afeta mais de 64 milhões de pessoas no mundo inteiro (1), apresentando uma prevalência de 16,5 % nos adultos com 50 ou mais anos em Portugal (2). Devido ao envelhecimento da população e à maior esperança de vida proporcionada pelos tratamentos eficazes, o número de pessoas afetadas pela doença tem vindo a aumentar. Assim, estimar o risco de morte na admissão é importante, pela elevada mortalidade imediata e a curto prazo, para identificar fatores precipitantes e comorbilidades críticas e para prevenir os reinternamentos (1).
 
-Na base *Heart Failure Clinical Records* (3), Chicco e Jurman (4) concluíram, através de algoritmos de *machine learning*, que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência. Porém, esta conclusão resultou de uma seleção de variáveis nos mesmos dados e assenta em métricas de classificação. Não se sabe se se mantém com o otimismo corrigido por validação interna e com a calibração avaliada, como recomenda a TRIPOD+AI (5).
+Na base *Heart Failure Clinical Records* (3), Chicco e Jurman (4) concluíram, através de algoritmos de *machine learning*, que a creatinina sérica e a fração de ejeção bastavam para prever a sobrevivência. Porém, esta conclusão resultou de uma seleção de variáveis nos mesmos dados e assenta em métricas de classificação. Não se sabe se a conclusão se mantém com o otimismo corrigido por validação interna e com a calibração avaliada, como recomenda a TRIPOD+AI (5).
 
 O objetivo deste trabalho foi comparar, após validação interna, a discriminação e a calibração de um modelo de regressão logística apenas com creatinina sérica e fração de ejeção com as de um modelo com todas as variáveis clínicas, na previsão da morte durante o seguimento.
 
@@ -244,14 +278,12 @@ O tempo de seguimento (`time`) foi excluído dos modelos, porque só se conhece 
 
 ### Variáveis
 
-A base de dados apresenta no total 13 variáveis: 11 características clínicas, o tempo de seguimento e o desfecho. Assim, os preditores foram:
-
+A base contém 13 variáveis: 11 características clínicas, o tempo de seguimento e o desfecho. As variáveis clínicas são:
 - 6 variáveis numéricas contínuas: “Idade, anos”, "Creatina fosfoquinase (CPK), mcg/L", "Fração de ejeção, %", "Plaquetas, kiloplaquetas/mL", "Creatinina sérica, mg/dL" e "Sódio sérico, mEq/L"
-- 5 variáveis categóricas binárias: "Anemia", "Diabetes", "Hipertensão arterial", "Sexo masculino", "Fumador"
+- 5 variáveis categóricas binárias: "Anemia", "Diabetes", "Hipertensão arterial", "Sexo", "Fumador"
 
-As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino.
-
-Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline natural de 3 graus de liberdade pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
+As variáveis binárias foram codificadas como 0 (não) ou 1 (sim); no sexo, 1 corresponde ao sexo masculino. A base não inclui uma descrição das variáveis; a codificação do sexo foi inferida por contagem: 194 doentes têm sex = 1, o mesmo número de homens descrito por Ahmad et al. (3).
+Após classificação das variáveis e antes de ajustar os modelos, foi necessário verificar a forma de cada variável contínua. Para a creatinina sérica e a CPK, que apresentam distribuição assimétrica à direita, comparámos o termo linear com uma spline cúbica pelo teste de razão de verosimilhanças. Quando a forma linear foi rejeitada (p<0,05), escolhemos entre o logaritmo e a spline pelo AIC. Assim, a creatinina entrou em logaritmo natural e a CPK e restantes variáveis entraram como estão na base.
 
 Definimos, então, dois modelos: o modelo 1, com a creatinina, em logaritmo, e a fração de ejeção, as duas variáveis propostas por Chicco e Jurman (4), e o modelo 4, que inclui as 11 variáveis clínicas. Com `r n_mortes` mortes, o número de mortes por parâmetro, contando a ordenada na origem, foi `r num(epp_1, 1)` no modelo 1 e `r num(epp_4, 1)` no modelo 4. Este último fica abaixo da regra prática de 10, o que faz esperar sobreajustamento.
 
@@ -265,7 +297,7 @@ A comparação baseou-se na diferença de AUC validada (modelo 4 − modelo 1), 
 
 A calibração foi avaliada nas previsões da validação cruzada: o gráfico por decis, a média prevista contra a observada, a *calibration-in-the-large* (ideal 0) e o declive (ideal 1), com IC 95 %.
 
-<!-- POR FAZER: descrever aqui a análise de sensibilidade, que ainda falta no analise.R. -->
+Como análise de sensibilidade, repetimos a comparação com a creatinina sérica na forma linear (sem logaritmo), mantendo as mesmas 10 partes da validação cruzada, para testar se a decisão da transformação logarítmica afetava a conclusão.
 
 A análise foi feita em R `r paste(R.version$major, R.version$minor, sep = ".")` com os pacotes tidyverse, here, pROC, gtsummary e broom; as versões encontram-se no Anexo C. Este relatório segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se no [Anexo B](#anexo-tripod).
 
@@ -589,7 +621,46 @@ grafico_calibracao(cal4)
 
 ### Análise de sensibilidade
 
-<!-- Secção 8 do analise.R: ainda por fazer. -->
+```{r}
+#| label: sensibilidade
+# Fórmulas com creatinina linear (sem log)
+f1_lin <- y ~ serum_creatinine + ejection_fraction
+f4_lin <- y ~ serum_creatinine + ejection_fraction + age + serum_sodium +
+              anaemia + high_blood_pressure + diabetes + sex + smoking +
+              creatinine_phosphokinase + platelets
+
+# Validação cruzada com as mesmas 10 partes da análise principal
+pcv1_lin <- numeric(nrow(dataset))
+pcv4_lin <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+  pcv1_lin[dataset$parte == k] <- ajustar(f1_lin, treino, teste)
+  pcv4_lin[dataset$parte == k] <- ajustar(f4_lin, treino, teste)
+}
+
+# AUC validada
+roc_cv1_lin <- roc(dataset$y, pcv1_lin, quiet = TRUE)
+roc_cv4_lin <- roc(dataset$y, pcv4_lin, quiet = TRUE)
+ci_cv1_lin  <- ci.auc(roc_cv1_lin)
+ci_cv4_lin  <- ci.auc(roc_cv4_lin)
+
+# Comparação
+comp_lin    <- roc.test(roc_cv1_lin, roc_cv4_lin, paired = TRUE, method = "delong")
+dif_auc_lin <- auc(roc_cv4_lin) - auc(roc_cv1_lin)
+dif_inf_lin <- -comp_lin$conf.int[2]
+dif_sup_lin <- -comp_lin$conf.int[1]
+dif_p_lin   <- comp_lin$p.value
+
+# Calibração
+dados_cv1_lin <- data.frame(y = dataset$y, p = pcv1_lin)
+dados_cv4_lin <- data.frame(y = dataset$y, p = pcv4_lin)
+res_cal1_lin  <- resumo_calibracao(dados_cv1_lin)
+res_cal4_lin  <- resumo_calibracao(dados_cv4_lin)
+```
+
+Com a creatinina sérica na forma linear, a AUC validada foi de `r num_ic(auc(roc_cv1_lin), ci_cv1_lin[1], ci_cv1_lin[3])` no modelo 1 e de `r num_ic(auc(roc_cv4_lin), ci_cv4_lin[1], ci_cv4_lin[3])` no modelo 4. A diferença foi de `r num_ic(dif_auc_lin, dif_inf_lin, dif_sup_lin)` (p = `r num_p(dif_p_lin)`). O declive de calibração foi de `r num(res_cal1_lin$declive, 2)` no modelo 1 e de `r num(res_cal4_lin$declive, 2)` no modelo 4. A conclusão da análise principal mantém-se: os dados continuam a ser compatíveis com a ausência de diferença entre os dois modelos.
 
 ## Discussão
 
@@ -604,8 +675,8 @@ Chicco e Jurman (4) concluíram que estas duas variáveis, sozinhas, davam previ
 - **Seguimento variável.** O seguimento durou entre `r min(dataset$time)` e `r max(dataset$time)` dias e a morte foi tratada como desfecho binário: quem foi seguido poucos dias conta como sobrevivente, mesmo que tenha morrido depois. Este erro de classificação reduz provavelmente a discriminação dos dois modelos de forma semelhante e deve afetar pouco a diferença entre eles, mas as probabilidades previstas não correspondem a um prazo fixo, o que limita a interpretação do risco absoluto.
 - **Dois hospitais e um ano.** Os doentes vêm de dois hospitais da mesma cidade, internados entre abril e dezembro de 2015, e a base não identifica o hospital de cada um, o que impediu avaliar a heterogeneidade entre centros. Noutra população, é provável que a discriminação seja mais baixa e que a calibração se altere, e a diferença entre os modelos pode não ser a mesma.
 - **Confundimento não medido.** A base não regista os tratamentos recebidos, a classe da NYHA de cada doente nem biomarcadores como os péptidos natriuréticos. Os coeficientes não têm interpretação causal, e um modelo que incluísse estes preditores poderia superar o modelo 1 por uma margem maior do que a observada.
-- **Poucas mortes.** Com `r n_mortes` mortes, os IC são largos: a amostra não distingue a ausência de diferença de uma vantagem de `r num(dif_sup)` na AUC. É esta imprecisão que impede concluir pela equivalência.
-- **Escolhas feitas nos mesmos dados.** As duas variáveis do modelo 1 foram selecionadas por Chicco e Jurman (4) nestes mesmos doentes, e esse otimismo não foi corrigido: em doentes novos, a vantagem do modelo completo pode ser maior do que a estimada. A forma da creatinina também foi escolhida com todos os dados, mas a análise de sensibilidade sugere que pesou pouco.
+- **Poucas mortes.** Com `r n_mortes` mortes, os IC são largos: a amostra não distingue a ausência de diferença de uma vantagem de `r num(dif_sup)` na AUC. É esta imprecisão que impede concluir pela equivalência. Além disso, o modelo 4, com `r num(epp_4, 1)` mortes por parâmetro, não teve dados suficientes para estimar bem os seus 12 coeficientes; com uma amostra maior, o sobreajustamento diminuiria e a vantagem do modelo completo poderia ser maior do que a estimada.
+- **Escolhas feitas nos mesmos dados.** As duas variáveis do modelo 1 foram selecionadas por Chicco e Jurman (4) nestes mesmos doentes, e esse otimismo não foi corrigido: em doentes novos, a vantagem do modelo completo pode ser maior do que a estimada. A forma da creatinina também foi escolhida com todos os dados, mas a análise de sensibilidade mostrou que a conclusão não depende desta escolha.
 - **Equidade.** Não avaliámos o desempenho por subgrupos: `r num(100 * mean(dataset$sex), 1)` % dos doentes são homens e todos provêm de uma só população. Não sabemos se a conclusão se mantém nas mulheres ou noutros grupos.
 
 ### Transportabilidade

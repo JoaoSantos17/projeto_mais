@@ -433,5 +433,71 @@ ggplot(cal4, aes(x = prevista, y = observada)) +
        title = "Calibração — Modelo 4 (validação cruzada)") +
   theme_minimal()
 
-# 8. Análise de sensibilidade
+# 8. Análise de sensibilidade ------------------------------------------------
+#
+# Pergunta: a decisão de usar log(creatinina) afeta a conclusão?
+# Se a conclusão se mantiver com creatinina linear, é robusta a esta escolha.
+#
+# Repetimos as secções 5–7 com fórmulas novas (creatinina linear, sem log).
+# Usamos as MESMAS 10 partes da secção 5 (a coluna `parte` já existe em dataset).
+
+# 8.1 Fórmulas com creatinina linear (sem log)
+f1_lin <- y ~ serum_creatinine + ejection_fraction
+f4_lin <- y ~ serum_creatinine + ejection_fraction + age + serum_sodium +
+              anaemia + high_blood_pressure + diabetes + sex + smoking +
+              creatinine_phosphokinase + platelets
+
+# 8.2 Validação cruzada (mesmas partes que a análise principal)
+pcv1_lin <- numeric(nrow(dataset))
+pcv4_lin <- numeric(nrow(dataset))
+
+for (k in 1:10) {
+  treino <- dataset |> filter(parte != k)
+  teste  <- dataset |> filter(parte == k)
+
+  pcv1_lin[dataset$parte == k] <- ajustar(f1_lin, treino, teste)
+  pcv4_lin[dataset$parte == k] <- ajustar(f4_lin, treino, teste)
+}
+
+# AUC validada
+roc_cv1_lin <- roc(dataset$y, pcv1_lin, quiet = TRUE)
+roc_cv4_lin <- roc(dataset$y, pcv4_lin, quiet = TRUE)
+ci_cv1_lin  <- ci.auc(roc_cv1_lin)
+ci_cv4_lin  <- ci.auc(roc_cv4_lin)
+
+cat("Sensibilidade (creatinina linear):\n")
+cat("Modelo 1 — AUC validada:", round(auc(roc_cv1_lin), 3),
+    "(IC 95%", round(ci_cv1_lin[1], 3), "–", round(ci_cv1_lin[3], 3), ")\n")
+cat("Modelo 4 — AUC validada:", round(auc(roc_cv4_lin), 3),
+    "(IC 95%", round(ci_cv4_lin[1], 3), "–", round(ci_cv4_lin[3], 3), ")\n")
+
+# 8.3 Comparação (modelo 4 − modelo 1, creatinina linear)
+comp_lin <- roc.test(roc_cv1_lin, roc_cv4_lin, paired = TRUE, method = "delong")
+dif_auc_lin <- auc(roc_cv4_lin) - auc(roc_cv1_lin)
+dif_inf_lin <- -comp_lin$conf.int[2]
+dif_sup_lin <- -comp_lin$conf.int[1]
+
+cat("Diferença de AUC:", round(dif_auc_lin, 3),
+    "(IC 95%", round(dif_inf_lin, 3), "a", round(dif_sup_lin, 3), ")",
+    "p =", signif(comp_lin$p.value, 3), "\n")
+
+# 8.4 Calibração (creatinina linear)
+dados_cv1_lin <- data.frame(y = dataset$y, p = pcv1_lin)
+dados_cv4_lin <- data.frame(y = dataset$y, p = pcv4_lin)
+
+cat("\nCalibração — sensibilidade:\n")
+cat("Modelo 1:\n")
+print(resumo_calibracao(dados_cv1_lin))
+cat("Modelo 4:\n")
+print(resumo_calibracao(dados_cv4_lin))
+
+# 8.5 Comparação com a análise principal
+cat("\n--- Comparação: análise principal vs. sensibilidade ---\n")
+cat("AUC validada modelo 1: log =", round(auc(roc_cv1), 3),
+    "| linear =", round(auc(roc_cv1_lin), 3), "\n")
+cat("AUC validada modelo 4: log =", round(auc(roc_cv4), 3),
+    "| linear =", round(auc(roc_cv4_lin), 3), "\n")
+cat("Diferença (mod 4 − mod 1): log =", round(auc(roc_cv4) - auc(roc_cv1), 3),
+    "| linear =", round(dif_auc_lin, 3), "\n")
+
 # 9. Figuras

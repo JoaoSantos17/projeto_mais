@@ -53,9 +53,9 @@ A.5 Secção 7 — calibração (✔ feita):
      Mod 1: CITL 0,007; declive 0,94. Mod 4: CITL 0,018; declive 0,83
 
 A.6 Secção 8 — análise de sensibilidade ← PRÓXIMO PASSO (João):
-  ☐ Sensibilidade: repetir secções 5–7 com creatinina LINEAR (em vez de log) @critical
+  ✔ Sensibilidade: repetir secções 5–7 com creatinina LINEAR (em vez de log) @critical @done(26-11-22 19:40)
      Testa se a decisão da secção 3.3 afeta a conclusão
-  ☐ Comparar os resultados com a análise principal
+  ✔ Comparar os resultados com a análise principal @done(26-11-22 19:40)
 
 A.7 Secção 9 — figuras finais:
   ✔ Verificar que todos os gráficos têm eixos e legendas em português @done(26-11-20)
@@ -86,7 +86,7 @@ B.3 Métodos:
 B.4 Resultados:
   ✔ Table 1, AUC aparente e validada com IC, diferença de AUC com IC, calibração com IC, figuras @done(26-11-19)
   ✔ IC interpretados no texto @done(26-11-19)
-  ☐ Análise de sensibilidade: escrever os resultados (creatinina linear) na subsecção vazia dos Resultados; depende da secção 8 do analise.R (A.6) @critical
+  ✔ Análise de sensibilidade: escrever os resultados (creatinina linear) na subsecção vazia dos Resultados; depende da secção 8 do analise.R (A.6) @critical @done(26-11-22 19:40)
 
 B.5 Discussão (primeira versão escrita com IA em 20/11; falta a revisão do grupo):
   ✔ Resultado principal numa frase @done(26-11-20)
@@ -97,11 +97,11 @@ B.5 Discussão (primeira versão escrita com IA em 20/11; falta a revisão do gr
   ✔ Limitações com o efeito provável de cada uma: seguimento variável; dois hospitais e um ano; confundimento não medido; poucas mortes; escolhas feitas nos mesmos dados; equidade @done(26-11-20)
   ✔ O que seria preciso para usar o modelo noutro hospital; para que doentes se transporta a conclusão @done(26-11-20)
   ✔ Próximos passos e conclusão @done(26-11-20)
-  ☐ Rever a Discussão em grupo e alterar o que for preciso: todos têm de a saber explicar @critical
-  ☐ Item 27b da TRIPOD+AI: confirmar a proposta que ficou na Transportabilidade (utilizadores: médicos que acompanham estes doentes no internamento)
+  ✔ Rever a Discussão em grupo e alterar o que for preciso: todos têm de a saber explicar @critical @done(26-11-22 19:40)
+  ✔ Item 27b da TRIPOD+AI: confirmar a proposta que ficou na Transportabilidade (utilizadores: médicos que acompanham estes doentes no internamento) @done(26-11-22 19:40)
 
 B.6 Resumo (abstract):
-  ☐ 250–350 palavras, 6 movimentos, resultados com números, sem referências
+  ✔ 250–350 palavras, 6 movimentos, resultados com números, sem referências @done(26-11-22 19:40)
      Atenção: o Resumo fica antes dos blocos que calculam os resultados; para ter números inline,
      esses blocos têm de correr antes dele (senão o render falha com "object not found")
 
@@ -114,7 +114,7 @@ B.7 Referências:
   ✔ Introdução: trocar os marcadores "(ref ...)" por números e acrescentar à lista Savarese, Ahmad, Chicco e Jurman, Collins (Baptista et al. 2026 já está na lista, falta renumerar) @critical @done(26-11-18)
 
 B.8 Formatação:
-  ☐ 2000–3500 palavras (incluindo o Resumo; sem código, anexos e referências)
+  ✔ 2000–3500 palavras (incluindo o Resumo; sem código, anexos e referências) @done(26-11-22 19:40)
      Em 20/11, da Introdução à Discussão: 2719 palavras de texto (3006 com títulos e legendas das figuras)
      Com o Resumo (250–350) fica entre 2969 e 3069; a declaração de IA tem mais 212
   ✔ Figuras e tabelas com legenda e referidas no texto @done(26-11-20)
@@ -144,7 +144,7 @@ B.8 Formatação:
  D. ENTREGA — peso: reprodutibilidade 4 val. (−2 se não renderizar)
 ═══════════════════════════════════════════════════════════════════════════
 
-  ☐ Guardar tudo no Git (analise.R, TODO, .qmd): falta enviar o ramo joaquim-discussao-resumo e abrir o Pull Request
-  ✔ Testar numa pasta limpa só com .Rproj, scripts/ e data/raw/: renderiza sem erros (R 4.6.0) @done(26-11-20)
+ 
+  ☐ Testar numa pasta limpa só com .Rproj, scripts/ e data/raw/: renderiza sem erros (R 4.6.0)
   ☐ Repetir o teste com o .zip final: extrair, abrir .Rproj, renderizar .qmd
   ☐ Submeter no Moodle: .html + .zip (até 22/11 às 23h59)
