@@ -6,10 +6,10 @@ Isabelle Araújo; Joao Santos; Joaquim Santos; Raquel Bragança
 Resumo
 
 Contexto. A insuficiência cardíaca tem elevada mortalidade e estimar o
-risco de morte na admissão pode orientar decisões clínicas. Chicco e
-Jurman (2020) sugeriram que a creatinina sérica e a fração de ejeção
-bastam para prever a sobrevivência, mas a conclusão assenta em métricas
-de classificação, sem correção do otimismo.
+risco de morte na admissão pode orientar decisões clínicas. Um estudo
+anterior nesta base de dados sugeriu que a creatinina sérica e a fração
+de ejeção bastam para prever a sobrevivência, mas a conclusão assenta em
+métricas de classificação, sem correção do otimismo.
 
 Lacuna. Não se sabe se esta conclusão se mantém quando se corrige o
 otimismo por validação cruzada e se avalia a calibração dos modelos.
@@ -31,7 +31,8 @@ Resultados. A AUC validada foi de 0,761 (IC 95 % 0,699 a 0,822) no
 modelo 1 e de 0,781 (IC 95 % 0,724 a 0,838) no modelo 4. A diferença foi
 de 0,021 (IC 95 % −0,019 a 0,061) (p = 0,309), compatível tanto com a
 ausência de diferença como com uma pequena vantagem do modelo completo.
-O declive de calibração foi de 0,94 no modelo 1 e de 0,83 no modelo 4.
+O declive de calibração foi de 0,94 (IC 95 % 0,65 a 1,23) no modelo 1 e
+de 0,83 (IC 95 % 0,59 a 1,07) no modelo 4.
 
 Conclusões. Nesta coorte, o modelo com duas variáveis discriminou de
 forma semelhante ao modelo completo e sem sinais de pior calibração. A
@@ -161,9 +162,9 @@ validação cruzada, para testar se a decisão da transformação logarítmica
 afetava a conclusão.
 
 A análise foi feita em R 4.6.1 com os pacotes tidyverse, here, pROC,
-gtsummary e broom; as versões encontram-se no Anexo C. Este relatório
-segue as recomendações da TRIPOD+AI; a lista de verificação encontra-se
-no Anexo B.
+gtsummary, broom, splines e knitr; as versões encontram-se no Anexo C.
+Este relatório segue as recomendações da TRIPOD+AI (5); a lista de
+verificação encontra-se no Anexo B.
 
 Resultados
 
@@ -564,9 +565,10 @@ Análise de sensibilidade
 Com a creatinina sérica na forma linear, a AUC validada foi de 0,754 (IC
 95 % 0,690 a 0,818) no modelo 1 e de 0,778 (IC 95 % 0,720 a 0,835) no
 modelo 4. A diferença foi de 0,024 (IC 95 % −0,020 a 0,068) (p = 0,291).
-O declive de calibração foi de 0,91 no modelo 1 e de 0,82 no modelo 4. A
-conclusão da análise principal mantém-se: os dados continuam a ser
-compatíveis com a ausência de diferença entre os dois modelos.
+O declive de calibração foi de 0,91 (IC 95 % 0,60 a 1,23) no modelo 1 e
+de 0,82 (IC 95 % 0,57 a 1,06) no modelo 4. A conclusão da análise
+principal mantém-se: os dados continuam a ser compatíveis com a ausência
+de diferença entre os dois modelos.
 
 Discussão
 
@@ -577,9 +579,9 @@ clínicas: a diferença de AUC validada foi de 0,021 (IC 95 % −0,019 a
 a ausência de diferença, mas também com uma vantagem do modelo 4 de até
 0,061, pelo que os dados não demonstram que os dois modelos são
 equivalentes. Nas análises secundárias, o modelo 4 teve mais otimismo e
-um declive de calibração mais afastado de 1 (0,83 contra 0,94), como se
-espera com 8,0 mortes por parâmetro, embora os IC dos dois declives se
-sobreponham.
+um declive de calibração mais afastado de 1: 0,83 (IC 95 % 0,59 a 1,07),
+contra 0,94 (IC 95 % 0,65 a 1,23) no modelo 1. É o que se espera com 8,0
+mortes por parâmetro, embora os IC dos dois declives se sobreponham.
 
 Em termos clínicos, a diferença estimada significa que, em cada 100
 pares formados por um doente que morreu e outro que sobreviveu, o modelo
@@ -999,24 +1001,20 @@ Anexo C: ambiente de execução
     # ambiente de execução.
     sessionInfo()
 
-    R version 4.6.1 (2026-06-24)
-    Platform: x86_64-pc-linux-gnu
-    Running under: Ubuntu 24.04.2 LTS
+    R version 4.6.1 (2026-06-24 ucrt)
+    Platform: x86_64-w64-mingw32/x64
+    Running under: Windows 11 x64 (build 26300)
 
     Matrix products: default
-    BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0 
-    LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.12.0  LAPACK version 3.12.0
+      LAPACK version 3.12.1
 
     locale:
-     [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
-     [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
-     [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
-     [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
-     [9] LC_ADDRESS=C               LC_TELEPHONE=C            
-    [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+    [1] LC_COLLATE=Portuguese_Portugal.utf8  LC_CTYPE=Portuguese_Portugal.utf8   
+    [3] LC_MONETARY=Portuguese_Portugal.utf8 LC_NUMERIC=C                        
+    [5] LC_TIME=Portuguese_Portugal.utf8    
 
     time zone: Europe/Lisbon
-    tzcode source: system (glibc)
+    tzcode source: internal
 
     attached base packages:
     [1] stats     graphics  grDevices utils     datasets  methods   base     
@@ -1028,12 +1026,12 @@ Anexo C: ambiente de execução
     [13] ggplot2_4.0.3   tidyverse_2.0.0
 
     loaded via a namespace (and not attached):
-     [1] gtable_0.3.6       xfun_0.61          lattice_0.23-1     tzdb_0.5.0        
+     [1] gtable_0.3.6       xfun_0.60          lattice_0.22-9     tzdb_0.5.0        
      [5] vctrs_0.7.3        tools_4.6.1        generics_0.1.4     stats4_4.6.1      
-     [9] parallel_4.6.1     pkgconfig_2.0.3    Matrix_1.7-6       RColorBrewer_1.1-3
+     [9] parallel_4.6.1     pkgconfig_2.0.3    Matrix_1.7-5       RColorBrewer_1.1-3
     [13] S7_0.2.2           gt_1.3.0           lifecycle_1.0.5    compiler_4.6.1    
     [17] farver_2.1.2       litedown_0.11      htmltools_0.5.9    sass_0.4.10       
-    [21] yaml_2.3.12        pillar_1.11.1      crayon_1.5.3       nlme_3.1-171      
+    [21] yaml_2.3.12        pillar_1.11.1      crayon_1.5.3       nlme_3.1-169      
     [25] commonmark_2.0.0   tidyselect_1.2.1   digest_0.6.39      stringi_1.8.9     
     [29] labeling_0.4.3     splines_4.6.1      rprojroot_2.1.1    fastmap_1.2.0     
     [33] grid_4.6.1         cli_3.6.6          magrittr_2.0.5     base64enc_0.1-6   
