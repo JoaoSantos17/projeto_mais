@@ -695,19 +695,36 @@ Nesta coorte, um modelo com creatinina sérica e fração de ejeção previu a m
 
 ## Declaração de uso de inteligência artificial
 
-Declaramos que na elaboração deste trabalho foram utilizadas ferramentas de inteligência artificial generativa:
+Declaramos que na elaboração deste trabalho foram utilizadas as seguintes ferramentas de inteligência artificial generativa:
 
-- Ferramenta: Claude (Anthropic); na sessão de 20/11, o modelo Claude Fable 5.2, através do Claude Code. **[PREENCHER: modelo e versão usados nas outras sessões, incluindo o assistente «professor-mais»]**
-- Tipo de assistência: apoio à escrita de código R; apoio à organização do projeto (Git, GitHub, guia, README e lista de tarefas); primeira versão do texto da Discussão; verificação das referências e da renderização do relatório.
-- Nível HEAT-AI do uso: **[PREENCHER: mínimo / limitado / alto]**
-- Secções em que foi aplicada: Métodos e Resultados (código); Discussão (primeira versão do texto); esta declaração e o Anexo D.
-- Prompts utilizados: lista resumida, por elemento do grupo, no [Anexo D](#anexo-ia).
-- Verificações humanas efetuadas: **[PREENCHER: código testado; resultados refeitos; fontes confirmadas no original; controlo de privacidade]** O que o grupo corrigiu ou rejeitou nas respostas dos modelos está no Anexo D.
-- Período de utilização: **[PREENCHER: de dd/mm]** a 20/11.
+- **Ferramentas:** Claude (Anthropic), em três ambientes: Claude Code com o modelo Claude Opus 5.5 (`claude-opus-5-5`), como extensão do Visual Studio Code; Claude Code com o modelo Claude Fable 5.2; e claude.ai com o modelo Claude Opus 5.5. O uso de cada elemento do grupo está descrito no Anexo D.
+- **Tipo de assistência:**
+    - explicação de conceitos estatísticos (regressão logística, *odds ratio*, AUC, validação cruzada, calibração) e do guião do trabalho;
+    - código R e Quarto: adaptação do código da sessão 4 ao modelo de duas variáveis; funções de análise (forma das variáveis no logit, ajuste, validação cruzada, calibração); passagem do código do `analise.R` para o `relatorio.qmd`; números *inline* com vírgula decimal; tabela de coeficientes (Anexo A); resolução de erros no RStudio;
+    - deteção e correção de um erro: o IC da diferença de AUC tinha os limites e o sinal trocados;
+    - apoio à interpretação dos resultados (*odds ratios*, AUC aparente e validada, diferença de AUC, calibração);
+    - revisão gramatical e de estilo de textos escritos pelo grupo;
+    - propostas de texto, revistas e aceites ou rejeitadas pelo grupo: frase do objetivo, frases dos Métodos e do desenho do estudo, interpretação dos intervalos de confiança, primeira versão da Discussão, Limitações e Transportabilidade;
+    - verificação bibliográfica (dados das referências e declaração de ética no artigo original) e formatação em Vancouver;
+    - organização do repositório e controlo de versões com Git (*branches*, *commits*, *push*), README, guia de Git e lista de tarefas;
+    - planeamento do trabalho, revisão do relatório face ao guião e à grelha, renderização numa pasta limpa, contagem de palavras e preparação desta declaração.
+- **Nível HEAT-AI do uso:** alto. A ferramenta produziu código e primeiras versões de texto, incluindo a da Discussão. Todo esse material foi revisto, alterado ou rejeitado pelo grupo.
+- **Secções em que foi aplicada:** Introdução (revisão e frase do objetivo); Métodos; Resultados (código, tabelas, figuras e texto de interpretação); Discussão (primeira versão, Limitações e Transportabilidade); Referências (verificação e formatação); Anexos A, B, C e D. [CONFIRMAR: O Resumo foi escrito pelo grupo sem IA; a versão que a ferramenta começou a escrever foi retirada.]
+- **Prompts utilizados:** lista resumida por elemento no Anexo D. Exemplos representativos:
+    - «Passar o código do analise.R para blocos do .qmd.»
+    - «Escrever os números inline com vírgula decimal, nunca à mão.»
+    - «Fazer as alterações que conseguires segundo estas indicações [lista de itens TRIPOD+AI em falta].»
+    - «Ajuda a interpretar a diferença de AUC entre os modelos, incluindo o intervalo de confiança e o valor de p, sem concluir que os modelos são equivalentes.»
+    - «Com base nos resultados do nosso estudo, ajuda a redigir uma primeira versão da Discussão, sem acrescentar resultados ou referências que não fornecemos.»
+- **Verificações humanas efetuadas:**
+    - Código: corrido no RStudio. O relatório foi renderizado após cada alteração e, no fim, numa pasta limpa. Os números do relatório (AUC, otimismo, teste da forma, calibração) coincidem com os do `analise.R` original e foram comparados com valores obtidos de forma independente.
+    - Base de dados: confirmada (299 doentes, 13 variáveis, sem valores em falta).
+    - Fontes: referências confirmadas nos artigos originais (incluindo Chicco e Jurman, 2020, e Ahmad et al., 2017). A referência do estudo PORTHOS foi encontrada pelo grupo.
+    - Propostas corrigidas ou rejeitadas: descritas no Anexo D.
+    - Privacidade: a base é pública (CC BY 4.0) e anonimizada; não foram introduzidos dados pessoais.
+- **Período de utilização:** de 30/09/2026 a 22/11/2026.
 
-O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pela ferramenta. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
-
-Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0).
+O conteúdo intelectual do trabalho, incluindo a sua estrutura, argumentação e conclusões, é da responsabilidade do grupo. Revimos e verificámos toda a informação gerada pelas ferramentas. Não introduzimos dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
 
 ## Referências
 
@@ -844,21 +861,33 @@ sessionInfo()
 ### Prompts utilizados
 
 | Elemento | Ferramenta e data | Para quê | Prompts |
-|--|---|------|------|
+|---|---|---|---|
 | Joaquim Santos | Claude Fable 5.2 (Claude Code), 20/11 | Juntar as alterações ainda por aprovar e confirmar que o relatório renderiza numa pasta limpa; escrever a primeira versão da Discussão, a partir dos resultados e da lista de tarefas do grupo; acrescentar o desenho do estudo aos Métodos e as referências cruzadas à análise de sensibilidade; confirmar as referências; preparar esta declaração | «quero que continues o trabalho. Em que parte vamos, o que falta fazer?»; «quero 2 coisas. 1, que coloques aqui o ficheiro completo do que já foi escrito. 2, que faças o que falta fazer»; «mas deves fazer o que falta num branch à parte»; «o resumo não o faças. Continua» |
-| Isabelle Araújo | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
-| João Santos | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
-| Raquel Bragança | **[PREENCHER]** | **[PREENCHER]** | **[PREENCHER]** |
+| Isabelle Araújo | Claude Opus 5.5 (claude.ai), 16/11 e 22/11; Claude Opus 5.5 (Claude Code, VS Code), 17/11 a 22/11 | Planear o trabalho e o cronograma (16/11); adaptar o modelo do relatório; passar o código do `analise.R` para o `.qmd`; números *inline*; rever a gramática da Introdução e dos Métodos; completar itens TRIPOD+AI; colocar e formatar referências; Git; contar palavras; consolidar esta declaração (22/11) | «ajudar a planear e estruturar o trabalho [...] cronograma, guia para a redação do relatório e pontos que exigem cuidado» (16/11); «Descarregar o modelo do relatório e adaptá-lo (título, autores, dados); apagar os exemplos do professor.»; «Passar o código do analise.R para blocos do .qmd.»; «Colocar nos Métodos/Introdução os parágrafos seguintes [texto do grupo] e corrigir a gramática.»; «Pôr a lista TRIPOD+AI nos anexos e fazer referência nos Métodos.»; «Contar as palavras sem código, anexos e referências.»; «resume tudo e faz uma declaração única» (22/11); restantes pedidos na declaração |
+| João Santos | [PREENCHER ou «Não usou IA»] | [PREENCHER] | [PREENCHER] |
+| Raquel Bragança | Claude Opus 5.5 (claude.ai), de 30/09 a 22/11 | Adaptar o código da sessão 4 ao modelo 1; confirmar a base e os resultados no R; interpretar OR, AUC e calibração; organizar o código para o GitHub; rever o relatório face ao guião e à grelha | «Com base nos resultados do nosso estudo, ajuda a redigir uma primeira versão da Discussão, sem acrescentar resultados ou referências que não fornecemos.»; «Ajuda a interpretar a diferença de AUC entre os modelos, incluindo o intervalo de confiança e o valor de p, sem concluir que os modelos são equivalentes.»; «Ajuda a organizar as limitações do estudo e a explicar as suas implicações para a interpretação e aplicação dos resultados.»; restantes pedidos em resumo: adaptação do código da sessão 4, confirmação da base, interpretação dos resultados do R, análise de sensibilidade com a creatinina em logaritmo, organização do repositório e revisão final |
 
 ### Texto e código produzidos por IA
 
-- Funções `logit_por_decil()`, `teste_forma()`, `ajustar()`, `calibracao()` e `resumo_calibracao()`; histogramas; código da AUC aparente, da validação cruzada, da comparação principal e da calibração; comentários sobre a distribuição das variáveis e a linearidade no logit.
+- Funções `logit_por_decil()`, `teste_forma()`, `ajustar()`, `calibracao()` e `resumo_calibracao()`; histogramas; código da AUC aparente, da validação cruzada, da comparação principal e da calibração; adaptação do código da sessão 4 ao modelo de duas variáveis.
+- Passagem do código do `analise.R` para o `relatorio.qmd`; funções de formatação com vírgula decimal; tabela de coeficientes (Anexo A).
+- Comentários sobre a distribuição das variáveis e a linearidade no logit.
+- Propostas de frases (objetivo, Métodos, interpretação dos IC, Limitações e Transportabilidade), revistas pelo grupo.
+- Primeira versão da Discussão (20/11). [PREENCHER: o que o grupo alterou depois de a rever]
 - Guia de Git, README e lista de tarefas do projeto.
-- Primeira versão da Discussão (20/11). **[PREENCHER: o que o grupo alterou depois de a rever]**
 
 ### O que o grupo corrigiu ou rejeitou
 
-- 16/11: rejeitámos um ramo (*branch*) proposto; questionámos a Tabela 1 e os histogramas.
-- 17/11: questionámos a *spline* e simplificámos o critério do AIC; testámos a forma só das variáveis assimétricas; rejeitámos uma análise de sensibilidade a 90 dias; propusemos usar os modelos 2 e 3 como análise de sensibilidade.
-- 20/11: não aceitámos o Resumo que a ferramenta tinha começado a escrever; essa versão foi retirada.
-- **[PREENCHER: o porquê de cada decisão]**
+| Data | Decisão | Porquê |
+|---|---|---|
+| 16/11 | Rejeitámos um ramo (*branch*) proposto; questionámos a Tabela 1 e os histogramas | [PREENCHER] |
+| 17/11 | Questionámos a *spline* e simplificámos o critério do AIC; testámos a forma só das variáveis assimétricas | [PREENCHER] |
+| 17/11 | Rejeitámos uma análise de sensibilidade a 90 dias; propusemos usar os modelos 2 e 3 como análise de sensibilidade | [PREENCHER] |
+| 20/11 | Não aceitámos o Resumo que a ferramenta tinha começado a escrever; essa versão foi retirada | O Resumo devia ser escrito pelo grupo [CONFIRMAR] |
+| — | Reduzimos o modelo de 12 para 11 variáveis | Sem `time`, não há 12 preditores na base |
+| — | Não usámos um *hazard ratio* proposto | Não foi possível confirmá-lo na fonte |
+| — | Retirámos uma dedução sobre possíveis valores imputados | Não tinha suporte na fonte |
+| — | Reformulámos a frase da lacuna | Afirmava o que não estava confirmado |
+| — | Retirámos frases que afirmavam escolhas «a priori» | Essas escolhas não foram feitas antes da análise |
+| — | Rejeitámos a validação cruzada repetida, o *bootstrap* do otimismo e as *splines* | Qualquer elemento do grupo tem de conseguir explicar a análise |
+| — | Corrigimos o IC da diferença de AUC | Tinha os limites e o sinal trocados |
