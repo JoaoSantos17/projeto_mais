@@ -755,6 +755,8 @@ argumentação e conclusões, é da responsabilidade do grupo. Revimos e
 verificámos toda a informação gerada pelas ferramentas. Não introduzimos
 dados pessoais, sensíveis ou confidenciais em serviços não autorizados.
 
+Modelo adaptado do Anexo A do quadro FMUP · IA (CC BY 4.0).
+
 Referências
 
 1.  Savarese G, Becher PM, Lund LH, Seferovic P, Rosano GMC, Coats AJS.
